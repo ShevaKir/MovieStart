@@ -3,8 +3,9 @@
 Description=mpv player for MovieStart
 
 [Service]
+# Vulkan output under labwc on the Pi 5 shows a black or frozen picture; OpenGL works.
 Environment=WAYLAND_DISPLAY=wayland-0
-ExecStart=/usr/bin/mpv --idle=yes --fullscreen --hwdec=auto-safe --input-ipc-server=%t/mpv.sock
+ExecStart=/usr/bin/mpv --idle=yes --fullscreen --vo=gpu-next --gpu-api=opengl --hwdec=auto-safe --input-ipc-server=%t/mpv.sock
 Restart=always
 RestartSec=3
 
