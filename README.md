@@ -48,7 +48,7 @@ MovieStart.slnx
 ## Requirements
 
 - **Mac:** .NET 10 SDK.
-- **Raspberry Pi 5:** Raspberry Pi OS Lite 64-bit, `mpv`, `qbittorrent-nox`, `ffmpeg`, `avahi-daemon`, Prowlarr; external USB drive for movies; active cooling.
+- **Raspberry Pi 5:** Raspberry Pi OS 64-bit with the desktop (mpv draws on the TV through the labwc session), `mpv`, `qbittorrent-nox`, `ffmpeg`, `avahi-daemon`, Docker for Prowlarr; movies on a separate drive (`/mnt/media/movies`).
 
 ## Development
 
@@ -73,11 +73,25 @@ Search uses the real TMDB (put `Tmdb:ReadAccessToken` into `MovieStart.Agent/app
 
 Local overrides go into `appsettings.Local.json` (gitignored). Port 5000 is avoided because macOS AirPlay Receiver uses it.
 
+## Deploy to the Pi
+
+One-time setup on the Pi:
+
+- qBittorrent: `sudo systemctl enable --now qbittorrent-nox@sheva-server`, WebUI on port 8090 (8080 is taken on this Pi), default save path `/mnt/media/movies`.
+- Prowlarr: copy `deploy/prowlarr/compose.yaml` to `/opt/prowlarr/` and run `docker compose up -d`; add indexers at `http://sheva-server.local:9696`.
+- Secrets in `/etc/moviestart/agent.env` (owner `root:sheva-server`, mode 640):
+
+```ini
+QBittorrent__BaseUrl=http://localhost:8090
+QBittorrent__Password=...
+Prowlarr__ApiKey=...
+Tmdb__ReadAccessToken=...
+```
+
+Then, from the Mac:
+
 ```bash
-# deploy the agent to the Pi
-dotnet publish MovieStart.Agent -c Release -r linux-arm64 --self-contained -o out
-rsync -a out/ <user>@sheva-server.local:/opt/moviestart/
-ssh <user>@sheva-server.local sudo systemctl restart moviestart-agent
+./scripts/deploy.sh   # publishes linux-arm64, installs /opt/moviestart, moviestart-agent.service and the mpv user unit
 ```
 
 ## Design

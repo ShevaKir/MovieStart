@@ -1,0 +1,18 @@
+[Unit]
+Description=MovieStart agent
+Wants=network-online.target
+After=network-online.target qbittorrent-nox@sheva-server.service
+
+[Service]
+User=sheva-server
+WorkingDirectory=/opt/moviestart
+ExecStart=/opt/moviestart/MovieStart.Agent
+# mpv runs in the user's desktop session (deploy/mpv.service).
+Environment=Player__SocketPath=/run/user/1000/mpv.sock
+# Secrets: QBittorrent__Password, Prowlarr__ApiKey, Tmdb__ReadAccessToken.
+EnvironmentFile=/etc/moviestart/agent.env
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
