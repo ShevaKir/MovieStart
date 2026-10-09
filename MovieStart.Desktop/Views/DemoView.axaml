@@ -1,0 +1,23 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MovieStart.Desktop.ViewModels"
+             x:Class="MovieStart.Desktop.Views.DemoView"
+             x:DataType="vm:MainWindowViewModel">
+  <StackPanel Margin="32,28" Spacing="16" MaxWidth="760" HorizontalAlignment="Left">
+    <TextBlock Classes="h1" Text="Demo" />
+    <TextBlock TextWrapping="Wrap" Foreground="#45433F"
+               Text="The agent runs in demo mode: movie search uses the real TMDB, while trackers, torrent downloads and the TV player are simulated. Finished downloads are short real video files with several audio and subtitle tracks, so track selection, the remote and deleting all work for real." />
+    <Border Classes="card">
+      <StackPanel Spacing="10">
+        <TextBlock Classes="h2" Text="Try it" />
+        <TextBlock TextWrapping="Wrap" Classes="muted" LineHeight="22"
+                   Text="1. Search for a movie or series and download a release.&#10;2. Watch it download in the library (about 25 seconds), or finish all downloads now.&#10;3. Press Watch: the player starts with the audio track from your voice-over profile.&#10;4. Use the remote: pause, seek, volume, audio and subtitle tracks." />
+      </StackPanel>
+    </Border>
+    <StackPanel Orientation="Horizontal" Spacing="8">
+      <Button Classes="accent" Content="Finish all downloads" Command="{Binding CompleteDemoDownloadsCommand}" />
+      <Button Content="Reset demo library" Command="{Binding ResetDemoCommand}" />
+    </StackPanel>
+    <TextBlock Text="{Binding DemoStatus}" Classes="muted" TextWrapping="Wrap" />
+  </StackPanel>
+</UserControl>

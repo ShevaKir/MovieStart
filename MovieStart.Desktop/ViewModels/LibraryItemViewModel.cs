@@ -59,11 +59,15 @@ public partial class LibraryItemViewModel : ObservableObject, IKeyed<Guid>
                 return "Watch";
 
             var episode = next.EpisodeCode is { } code ? $" {code}" : string.Empty;
-            if (next.Id == Item.LastPlayedFileId && next.Position > 0 && next.Duration > 0)
-                return $"Continue{episode} · {Format.Duration(next.Duration - next.Position)} left";
-            if (Item.LastPlayedFileId is not null && IsSeries)
-                return $"Next{episode}";
-            return $"Watch{episode}";
+            if (next.Id == Item.LastPlayedFileId)
+            {
+                return next.Position > 0 && next.Duration > 0
+                    ? $"Continue{episode} · {Format.Duration(next.Duration - next.Position)} left"
+                    : $"Continue{episode}";
+            }
+
+            // The last played episode is finished, so another one is offered.
+            return Item.LastPlayedFileId is not null && IsSeries ? $"Next{episode}" : $"Watch{episode}";
         }
     }
 

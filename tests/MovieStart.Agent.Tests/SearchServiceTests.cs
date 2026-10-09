@@ -1,5 +1,7 @@
+using MovieStart.Agent.Profile;
 using MovieStart.Agent.Search;
 using MovieStart.Shared.Library;
+using MovieStart.Shared.Profile;
 using MovieStart.Shared.Search;
 
 namespace MovieStart.Agent.Tests;
@@ -10,11 +12,12 @@ public class SearchServiceTests
 
     private readonly FakeProwlarr _prowlarr = new();
     private readonly FakeTmdb _tmdb = new();
+    private readonly FakeProfiles _profiles = new();
     private readonly SearchService _search;
 
     public SearchServiceTests()
     {
-        _search = new SearchService(_tmdb, _prowlarr);
+        _search = new SearchService(_tmdb, _prowlarr, _profiles);
     }
 
     private static CancellationToken Token => TestContext.Current.CancellationToken;
@@ -107,6 +110,33 @@ public class SearchServiceTests
         Assert.Equal(
             ["Dune.2021.1080p.BluRay.x265.10bit.mkv", "Dune.2021.1080p.BluRay.x264.mp4", "Dune.2021.1080p.WEBRip.x264"],
             releases.Select(r => r.Title));
+    }
+
+    [Fact]
+    public async Task ReleasesWithThePreferredVoiceComeFirst()
+    {
+        _prowlarr.Add("Dune.2021.1080p.BluRay.x265.10bit.mkv", seeders: 500);
+        _prowlarr.Add("Дюна / Dune [2021, WEB-DL 1080p] MVO (HDRezka Studio)", seeders: 5);
+        _prowlarr.Add("Дюна / Dune [2021, WEBRip 1080p] Ukr (Dub)", seeders: 5);
+
+        var releases = await _search.SearchReleasesAsync(Dune, Token);
+
+        // Default profile: Ukrainian dub, Russian dub, Russian multi-voice, English original.
+        Assert.Equal(
+            ["Дюна / Dune [2021, WEBRip 1080p] Ukr (Dub)", "Дюна / Dune [2021, WEB-DL 1080p] MVO (HDRezka Studio)", "Dune.2021.1080p.BluRay.x265.10bit.mkv"],
+            releases.Select(r => r.Title));
+    }
+
+    [Fact]
+    public async Task CustomProfileChangesTheOrder()
+    {
+        _profiles.Profile = new VoiceProfile([new VoicePreference("rus", VoiceType.Mvo, "HDRezka")], []);
+        _prowlarr.Add("Дюна / Dune [2021, BDRip 1080p] Ukr (Dub)", seeders: 50);
+        _prowlarr.Add("Дюна / Dune [2021, WEBRip 1080p] MVO (HDRezka Studio)", seeders: 5);
+
+        var releases = await _search.SearchReleasesAsync(Dune, Token);
+
+        Assert.Equal("Дюна / Dune [2021, WEBRip 1080p] MVO (HDRezka Studio)", releases[0].Title);
     }
 
     [Fact]

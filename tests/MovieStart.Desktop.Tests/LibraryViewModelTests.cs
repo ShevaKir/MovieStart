@@ -80,6 +80,7 @@ public class LibraryViewModelTests
     [Theory]
     [InlineData(null, 0, 0, false, "Watch S01E01")]
     [InlineData(1, 600, 3000, false, "Continue S01E01 · 40:00 left")]
+    [InlineData(1, 0, 0, false, "Continue S01E01")]
     [InlineData(1, 2900, 3000, true, "Next S01E02")]
     public void PlayButtonSaysWhatWillPlay(int? lastPlayed, double position, double duration, bool watched, string expected)
     {

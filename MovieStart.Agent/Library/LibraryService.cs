@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using MovieStart.Agent.Downloads;
 using MovieStart.Agent.Media;
 using MovieStart.Agent.Player;
+using MovieStart.Agent.Profile;
 using MovieStart.Shared.Library;
 using MovieStart.Shared.Player;
 
@@ -14,6 +15,8 @@ public sealed class LibraryService(
     IQbitClient qbit,
     IPlayer player,
     IStorageProbe storage,
+    IMediaProbe probe,
+    IVoiceProfileStore profiles,
     IOptions<MediaOptions> media,
     TimeProvider time,
     ILogger<LibraryService> logger)
@@ -192,7 +195,13 @@ public sealed class LibraryService(
             var start = request.FromStart || file.Watched || file.Position < MinResumeSeconds
                 ? 0
                 : file.Position - ResumeRewindSeconds;
-            await player.PlayAsync(GetFilePath(item, file), start, cancellationToken);
+
+            // Tracks are known once ffprobe has read the file; until then the player picks.
+            var tracks = file.AudioTracks is null
+                ? null
+                : VoiceMatcher.Choose(profiles.Get(), file.AudioTracks, file.SubtitleTracks ?? []);
+            var options = new PlaybackOptions(start, tracks?.AudioId, tracks is null ? null : new SubtitleChoice(tracks.SubtitleId));
+            await player.PlayAsync(GetFilePath(item, file), options, cancellationToken);
 
             item = item with { LastPlayedFileId = file.Id, LastPlayedAt = time.GetUtcNow() };
             await store.SaveAsync(item, cancellationToken);
@@ -291,6 +300,45 @@ public sealed class LibraryService(
         {
             _gate.Release();
         }
+    }
+
+    /// <summary>Reads audio and subtitle tracks of downloaded files that have not been probed yet.</summary>
+    /// <returns>Number of files probed.</returns>
+    public async Task<int> ProbeNewFilesAsync(CancellationToken cancellationToken)
+    {
+        var pending = _items.Values
+            .SelectMany(item => item.Files.Where(file => file.AudioTracks is null).Select(file => (item, file)))
+            .ToList();
+
+        foreach (var (item, file) in pending)
+        {
+            // ffprobe can take a moment; run it outside the lock.
+            var result = await probe.ProbeAsync(GetFilePath(item, file), cancellationToken);
+
+            await _gate.WaitAsync(cancellationToken);
+            try
+            {
+                if (!_items.TryGetValue(item.Id, out var current) || current.Files.FirstOrDefault(f => f.Id == file.Id) is not { } latest)
+                    continue;
+
+                // An unreadable file gets empty lists so it is not probed again on every pass.
+                var probed = latest with
+                {
+                    AudioTracks = result?.Audio ?? [],
+                    SubtitleTracks = result?.Subtitles ?? [],
+                    Duration = latest.Duration > 0 ? latest.Duration : result?.Duration ?? 0,
+                };
+                current = current with { Files = current.Files.Select(f => f.Id == file.Id ? probed : f).ToList() };
+                await store.SaveAsync(current, cancellationToken);
+                _items[current.Id] = current;
+            }
+            finally
+            {
+                _gate.Release();
+            }
+        }
+
+        return pending.Count;
     }
 
     internal static DownloadStatus MapStatus(QbitTorrent torrent) => torrent.State switch

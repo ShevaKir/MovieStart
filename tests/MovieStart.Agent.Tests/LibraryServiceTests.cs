@@ -3,6 +3,8 @@ using Microsoft.Extensions.Options;
 using MovieStart.Agent.Downloads;
 using MovieStart.Agent.Library;
 using MovieStart.Agent.Media;
+using MovieStart.Agent.Player;
+using MovieStart.Agent.Profile;
 using MovieStart.Shared.Library;
 using MovieStart.Shared.Player;
 
@@ -17,6 +19,8 @@ public sealed class LibraryServiceTests : IDisposable
     private readonly FakeQbitClient _qbit = new();
     private readonly FakePlayer _player = new();
     private readonly FakeStorage _storage = new() { Free = 100 * Gb };
+    private readonly FakeProbe _probe = new();
+    private readonly FakeProfiles _profiles = new();
     private readonly ManualTimeProvider _time = new(new DateTimeOffset(2026, 10, 9, 12, 0, 0, TimeSpan.Zero));
     private readonly FileLibraryStore _store;
     private readonly LibraryService _library;
@@ -32,7 +36,8 @@ public sealed class LibraryServiceTests : IDisposable
     private static CancellationToken Token => TestContext.Current.CancellationToken;
 
     private LibraryService CreateService() => new(
-        _store, _qbit, _player, _storage, Options.Create(new MediaOptions { Root = _root }), _time, NullLogger<LibraryService>.Instance);
+        _store, _qbit, _player, _storage, _probe, _profiles, Options.Create(new MediaOptions { Root = _root }), _time,
+        NullLogger<LibraryService>.Instance);
 
     private static AddToLibraryRequest Movie(string title = "Dune", long? size = 6 * Gb) =>
         new(MediaKind.Movie, title, Magnet, size, TmdbId: 438631, ReleaseTitle: "Dune.2021.1080p.BDRip.x265");
@@ -375,6 +380,59 @@ public sealed class LibraryServiceTests : IDisposable
             () => _library.PauseDownloadAsync(series.Id, series.Downloads[0].Id, Token));
     }
 
+    [Fact]
+    public async Task ProbingStoresTracksAndDuration()
+    {
+        var series = await AddReadySeasonAsync();
+        _probe.Result = new ProbeResult(3480, [new MediaTrack(1, "ukr", "Дубляж"), new MediaTrack(2, "eng", null)], [new MediaTrack(1, "ukr", "Forced")]);
+
+        Assert.Equal(3, await _library.ProbeNewFilesAsync(Token));
+        Assert.Equal(0, await _library.ProbeNewFilesAsync(Token));
+
+        var file = _library.List()[0].Files[0];
+        Assert.Equal(2, file.AudioTracks!.Count);
+        Assert.Single(file.SubtitleTracks!);
+        Assert.Equal(3480, file.Duration);
+        Assert.Equal(PathOf(series, series.Files[0]), _probe.Probed[0]);
+    }
+
+    [Fact]
+    public async Task UnreadableFilesAreNotProbedAgain()
+    {
+        await AddReadySeasonAsync();
+        _probe.Result = null;
+
+        await _library.ProbeNewFilesAsync(Token);
+
+        Assert.All(_library.List()[0].Files, file => Assert.Empty(file.AudioTracks!));
+        Assert.Equal(0, await _library.ProbeNewFilesAsync(Token));
+    }
+
+    [Fact]
+    public async Task PlaybackSelectsTracksFromTheProfile()
+    {
+        var series = await AddReadySeasonAsync();
+        _probe.Result = new ProbeResult(
+            3000,
+            [new MediaTrack(1, "rus", "MVO, LostFilm"), new MediaTrack(2, "ukr", "Дубляж"), new MediaTrack(3, "eng", "Original")],
+            [new MediaTrack(1, "ukr", "Написи"), new MediaTrack(2, "eng", null)]);
+        await _library.ProbeNewFilesAsync(Token);
+
+        await _library.PlayAsync(series.Id, new PlayItemRequest(), Token);
+
+        Assert.Equal(new PlaybackOptions(0, 2, new SubtitleChoice(1)), _player.PlayedOptions);
+    }
+
+    [Fact]
+    public async Task UnprobedFilesLeaveTrackChoiceToThePlayer()
+    {
+        var series = await AddReadySeasonAsync();
+
+        await _library.PlayAsync(series.Id, new PlayItemRequest(), Token);
+
+        Assert.Equal(new PlaybackOptions(), _player.PlayedOptions);
+    }
+
     private async Task<LibraryItem> AddReadySeasonAsync()
     {
         await _library.AddAsync(Series(season: 1), Token);
@@ -391,5 +449,18 @@ public sealed class LibraryServiceTests : IDisposable
         public long Free { get; set; }
 
         public StorageInfo Measure(string path) => new(500 * Gb, Free);
+    }
+
+    private sealed class FakeProbe : IMediaProbe
+    {
+        public ProbeResult? Result { get; set; }
+
+        public List<string> Probed { get; } = [];
+
+        public Task<ProbeResult?> ProbeAsync(string path, CancellationToken cancellationToken)
+        {
+            Probed.Add(path);
+            return Task.FromResult(Result);
+        }
     }
 }

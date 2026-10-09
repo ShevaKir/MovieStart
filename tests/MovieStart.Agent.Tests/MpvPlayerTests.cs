@@ -31,7 +31,7 @@ public sealed class MpvPlayerTests : IAsyncLifetime
     [Fact]
     public async Task PlayLoadsFileAndUnpauses()
     {
-        await _player.PlayAsync("/mnt/movies/Dune.mkv", 0, TestContext.Current.CancellationToken);
+        await _player.PlayAsync("/mnt/movies/Dune.mkv", new PlaybackOptions(), TestContext.Current.CancellationToken);
 
         var commands = _mpv.Commands.Where(c => Name(c) is not ("observe_property" or "get_property")).Select(Render).ToList();
         Assert.Equal(["loadfile /mnt/movies/Dune.mkv replace", "set_property pause False"], commands);
@@ -106,19 +106,23 @@ public sealed class MpvPlayerTests : IAsyncLifetime
     [Fact]
     public async Task PlayFromPositionPassesStartOption()
     {
-        await _player.PlayAsync("/mnt/movies/Show/S01E02.mkv", 754.5, TestContext.Current.CancellationToken);
+        await _player.PlayAsync("/mnt/movies/Show/S01E02.mkv", new PlaybackOptions(754.5), TestContext.Current.CancellationToken);
 
         var load = _mpv.Commands.Single(c => Name(c) == "loadfile");
         Assert.Equal("loadfile /mnt/movies/Show/S01E02.mkv replace -1 start=754.5", Render(load));
     }
 
     [Theory]
-    [InlineData(0, true, "loadfile /a.mkv replace")]
-    [InlineData(90, true, "loadfile /a.mkv replace -1 start=90")]
-    [InlineData(90, false, "loadfile /a.mkv replace start=90")]
-    public void BuildsLoadCommandForMpvVersion(double start, bool hasIndex, string expected)
+    [InlineData(0, null, false, null, true, "loadfile /a.mkv replace")]
+    [InlineData(90, null, false, null, true, "loadfile /a.mkv replace -1 start=90")]
+    [InlineData(90, null, false, null, false, "loadfile /a.mkv replace start=90")]
+    [InlineData(0, 2, true, null, true, "loadfile /a.mkv replace -1 aid=2,sid=no")]
+    [InlineData(12.5, 1, true, 3, true, "loadfile /a.mkv replace -1 start=12.5,aid=1,sid=3")]
+    public void BuildsLoadCommand(double start, int? audio, bool setSubtitles, int? subtitle, bool hasIndex, string expected)
     {
-        Assert.Equal(expected, string.Join(' ', MpvPlayer.ToLoadCommand("/a.mkv", start, hasIndex)));
+        var options = new PlaybackOptions(start, audio, setSubtitles ? new SubtitleChoice(subtitle) : null);
+
+        Assert.Equal(expected, string.Join(' ', MpvPlayer.ToLoadCommand("/a.mkv", options, hasIndex)));
     }
 
     [Theory]

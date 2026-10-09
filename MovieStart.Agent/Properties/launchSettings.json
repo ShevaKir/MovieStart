@@ -8,6 +8,17 @@
       "environmentVariables": {
         "ASPNETCORE_ENVIRONMENT": "Development"
       }
+    },
+    "demo": {
+      "commandName": "Project",
+      "dotnetRunMessages": true,
+      "launchBrowser": false,
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development",
+        "Demo__Enabled": "true",
+        "Media__Root": "/tmp/moviestart-demo",
+        "Player__SocketPath": "/tmp/moviestart-demo.sock"
+      }
     }
   }
 }

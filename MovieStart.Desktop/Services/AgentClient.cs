@@ -4,6 +4,7 @@ using MovieStart.Shared;
 using MovieStart.Shared.Health;
 using MovieStart.Shared.Library;
 using MovieStart.Shared.Player;
+using MovieStart.Shared.Profile;
 using MovieStart.Shared.Search;
 
 namespace MovieStart.Desktop.Services;
@@ -52,6 +53,16 @@ public interface IAgentClient
     /// <summary>Finds 1080p releases of a title, best first.</summary>
     Task<AgentResult<IReadOnlyList<ReleaseInfo>>> SearchReleasesAsync(
         string agentUrl, TitleResult title, string? query, CancellationToken cancellationToken = default);
+
+    Task<AgentResult<VoiceProfile>> GetVoiceProfileAsync(string agentUrl, CancellationToken cancellationToken = default);
+
+    Task<AgentResult> SaveVoiceProfileAsync(string agentUrl, VoiceProfile profile, CancellationToken cancellationToken = default);
+
+    /// <summary>Demo mode only: finish all simulated downloads.</summary>
+    Task<AgentResult> CompleteDemoDownloadsAsync(string agentUrl, CancellationToken cancellationToken = default);
+
+    /// <summary>Demo mode only: delete the demo library.</summary>
+    Task<AgentResult> ResetDemoAsync(string agentUrl, CancellationToken cancellationToken = default);
 }
 
 /// <param name="http">Should have no timeout of its own; each call sets one.</param>
@@ -128,6 +139,18 @@ public sealed class AgentClient(HttpClient http) : IAgentClient
             .Select(parameter => $"{parameter.Key}={Uri.EscapeDataString(parameter.Value!)}"));
         return GetResultAsync<IReadOnlyList<ReleaseInfo>>(agentUrl, $"{ApiRoutes.SearchReleases}?{queryString}", cancellationToken, SearchTimeout);
     }
+
+    public Task<AgentResult<VoiceProfile>> GetVoiceProfileAsync(string agentUrl, CancellationToken cancellationToken = default) =>
+        GetResultAsync<VoiceProfile>(agentUrl, ApiRoutes.VoiceProfile, cancellationToken, DefaultTimeout);
+
+    public Task<AgentResult> SaveVoiceProfileAsync(string agentUrl, VoiceProfile profile, CancellationToken cancellationToken = default) =>
+        SendAsync(agentUrl, HttpMethod.Put, ApiRoutes.VoiceProfile, cancellationToken, JsonContent.Create(profile));
+
+    public Task<AgentResult> CompleteDemoDownloadsAsync(string agentUrl, CancellationToken cancellationToken = default) =>
+        SendAsync(agentUrl, HttpMethod.Post, ApiRoutes.DemoCompleteDownloads, cancellationToken);
+
+    public Task<AgentResult> ResetDemoAsync(string agentUrl, CancellationToken cancellationToken = default) =>
+        SendAsync(agentUrl, HttpMethod.Post, ApiRoutes.DemoReset, cancellationToken, timeout: SearchTimeout);
 
     /// <summary>GET that reports why it failed, unlike the polling reads that just return null.</summary>
     private async Task<AgentResult<T>> GetResultAsync<T>(string agentUrl, string route, CancellationToken cancellationToken, TimeSpan timeout)
