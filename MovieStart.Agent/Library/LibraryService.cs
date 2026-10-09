@@ -64,6 +64,8 @@ public sealed class LibraryService(
 
     public StorageInfo GetStorage() => storage.Measure(media.Value.Root);
 
+    public LibraryItem GetItem(Guid itemId) => Get(itemId);
+
     public async Task<LibraryItem> AddAsync(AddToLibraryRequest request, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(request.Title))

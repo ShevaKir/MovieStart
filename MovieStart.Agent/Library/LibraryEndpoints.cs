@@ -25,6 +25,11 @@ public static class LibraryEndpoints
         app.MapDelete(item, (Guid id, LibraryService library, CancellationToken cancellationToken) =>
             RunAsync(() => library.DeleteAsync(id, cancellationToken)));
 
+        app.MapGet(item + "/poster", (Guid id, LibraryService library, PosterStore posters, CancellationToken cancellationToken) =>
+            RunAsync(async () => await posters.GetAsync(library.GetItem(id), cancellationToken) is { } path
+                ? Results.File(path, "image/jpeg")
+                : Results.NotFound()));
+
         app.MapPost(item + "/play", (Guid id, PlayItemRequest? request, LibraryService library, CancellationToken cancellationToken) =>
             RunAsync(async () => Results.Ok(await library.PlayAsync(id, request ?? new PlayItemRequest(), cancellationToken))));
 

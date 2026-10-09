@@ -26,6 +26,9 @@ public static class ApiRoutes
 
     public static string LibraryPlay(Guid id) => $"{Library}/{id}/play";
 
+    /// <summary>The item's poster, stored on the Pi.</summary>
+    public static string LibraryPoster(Guid id) => $"{Library}/{id}/poster";
+
     public static string LibraryDownload(Guid id, Guid downloadId) => $"{Library}/{id}/downloads/{downloadId}";
 
     public static string LibraryDownloadPause(Guid id, Guid downloadId) => $"{LibraryDownload(id, downloadId)}/pause";

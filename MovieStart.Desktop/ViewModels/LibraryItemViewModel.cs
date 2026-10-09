@@ -28,7 +28,7 @@ public partial class LibraryItemViewModel : ObservableObject, IKeyed<Guid>
         _library = library;
         _item = item;
         Update(item);
-        if (item.PosterUrl is { } url && library.Posters is { } posters)
+        if (item.PosterUrl is not null && library.Posters is { } posters && library.PosterUrl(item.Id) is { } url)
             _ = LoadPosterAsync(posters, url);
     }
 

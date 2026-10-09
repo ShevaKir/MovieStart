@@ -64,6 +64,7 @@ builder.Services.AddHostedService<LibraryWatcher>();
 builder.Services.AddHostedService<WatchTracker>();
 
 builder.Services.AddHttpClient<ITmdbClient, TmdbClient>(client => client.Timeout = TimeSpan.FromSeconds(10));
+builder.Services.AddHttpClient<PosterStore>(client => client.Timeout = TimeSpan.FromSeconds(15));
 builder.Services.AddSingleton<SearchService>();
 
 var app = builder.Build();
