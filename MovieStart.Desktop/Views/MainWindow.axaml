@@ -5,6 +5,7 @@
         x:Class="MovieStart.Desktop.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="MovieStart"
+        Icon="/Assets/icon.png"
         Width="1200" Height="800" MinWidth="960" MinHeight="600"
         Background="#F6F5F2">
   <DockPanel>
@@ -28,7 +29,18 @@
         </StackPanel>
 
         <StackPanel Spacing="24">
-          <TextBlock Text="MovieStart" FontSize="17" FontWeight="SemiBold" Margin="10,0" />
+          <StackPanel Orientation="Horizontal" Spacing="10" Margin="10,0">
+            <!-- Logo: play button inside a download ring; source in Assets/logo.svg -->
+            <Viewbox Width="26" Height="26">
+              <Canvas Width="100" Height="100">
+                <Rectangle Width="100" Height="100" RadiusX="22" RadiusY="22" Fill="#18794E" />
+                <Ellipse Canvas.Left="21" Canvas.Top="21" Width="58" Height="58" Stroke="#47FFFFFF" StrokeThickness="7" />
+                <Path Data="M 50,21 A 29,29 0 1 1 21,50" Stroke="White" StrokeThickness="7" StrokeLineCap="Round" />
+                <Path Data="M 44,39 L 44,61 L 62,50 Z" Fill="White" Stroke="White" StrokeThickness="4" StrokeJoin="Round" />
+              </Canvas>
+            </Viewbox>
+            <TextBlock Text="MovieStart" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" />
+          </StackPanel>
           <StackPanel Spacing="2">
             <Button Classes="nav" Classes.selected="{Binding IsSearchSection}" Command="{Binding ShowSearchCommand}" Content="Search" />
             <Button Classes="nav" Classes.selected="{Binding IsLibrarySection}" Command="{Binding ShowLibraryCommand}">
