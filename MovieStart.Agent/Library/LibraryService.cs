@@ -340,7 +340,7 @@ public sealed class LibraryService(
             var torrent = FindTorrent(torrents, download.Id);
             var (updated, completed) = Track(download, torrent);
             if (updated.Files is null && torrent is not null && updated.Status != DownloadStatus.Queued)
-                updated = updated with { Files = await ReadFilesAsync(kind, torrent.Hash, cancellationToken) };
+                updated = updated with { Files = await ReadFilesAsync(kind, updated.Season, torrent.Hash, cancellationToken) };
             IReadOnlyList<QbitFile>? files = null;
             if (completed)
             {
@@ -423,13 +423,14 @@ public sealed class LibraryService(
     }
 
     /// <summary>Reads the torrent's file list and turns off samples and extras right away.</summary>
-    private async Task<IReadOnlyList<DownloadFile>> ReadFilesAsync(MediaKind kind, string hash, CancellationToken cancellationToken)
+    /// <param name="season">Season of the download, for episode files that name only the episode ("02. Cover-Up.mkv").</param>
+    private async Task<IReadOnlyList<DownloadFile>> ReadFilesAsync(MediaKind kind, int? season, string hash, CancellationToken cancellationToken)
     {
         var files = await qbit.GetFilesAsync(hash, cancellationToken);
         var skip = FileSelection.AutoSkip(kind, files).Where(index => files.First(file => file.Index == index).IsWanted).ToList();
         await qbit.SetFilePriorityAsync(hash, skip, QbitClient.SkipPriority, cancellationToken);
         return files
-            .Select(file => FileSelection.ToDownloadFile(skip.Contains(file.Index) ? file with { Priority = QbitClient.SkipPriority } : file, kind))
+            .Select(file => FileSelection.ToDownloadFile(skip.Contains(file.Index) ? file with { Priority = QbitClient.SkipPriority } : file, kind, season))
             .ToList();
     }
 
@@ -451,6 +452,10 @@ public sealed class LibraryService(
                 return (download, false);
             return (download with { Status = DownloadStatus.Error, Error = "The torrent was removed from qBittorrent." }, false);
         }
+
+        // While qBittorrent re-hashes the data, "progress" is how far the check got, not the download.
+        if (torrent.State.StartsWith("checking", StringComparison.Ordinal))
+            return (download with { TorrentHash = torrent.Hash, DownloadSpeed = 0, EtaSeconds = null }, false);
 
         var updated = download with
         {

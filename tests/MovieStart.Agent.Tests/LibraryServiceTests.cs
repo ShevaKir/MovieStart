@@ -489,6 +489,33 @@ public sealed class LibraryServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task RecheckIsNotMistakenForAFinishedDownload()
+    {
+        var series = await AddRunningSeasonAsync();
+        _qbit.Update("h1", torrent => torrent with { State = "checkingDL", Progress = 1 });
+
+        await _library.SyncAsync(Token);
+
+        var download = _library.List()[0].Downloads[0];
+        Assert.Equal(DownloadStatus.Downloading, download.Status);
+        Assert.Equal(0.1, download.Progress);
+        Assert.Empty(_library.List()[0].Files);
+        Assert.Empty(_qbit.Paused);
+    }
+
+    [Fact]
+    public async Task EpisodeWithoutSeasonInItsNameTakesTheDownloadSeason()
+    {
+        await _library.AddAsync(Series(season: 2), Token);
+        _qbit.Appear("h1", progress: 0.1);
+        _qbit.Files["h1"] = [new QbitFile { Name = "Show/01. Inferno.mkv", Size = Gb }, new QbitFile { Name = "Show/02. Cover-Up.mkv", Size = Gb }];
+
+        await _library.SyncAsync(Token);
+
+        Assert.Equal(["S02E01", "S02E02"], _library.List()[0].Downloads[0].Files!.Select(file => file.EpisodeCode));
+    }
+
+    [Fact]
     public async Task ChoosingNeedsAVideoFile()
     {
         var series = await AddRunningSeasonAsync();
