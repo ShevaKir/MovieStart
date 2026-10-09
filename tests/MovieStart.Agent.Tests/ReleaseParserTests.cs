@@ -78,6 +78,25 @@ public class ReleaseParserTests
         Assert.Equal(["ukr", "eng"], release.Subtitles);
     }
 
+    [Theory]
+    [InlineData("Дюна / Dune: Part One (2021) UHD BDRip-HEVC 1080p от RIPS CLUB | HDR | D", true)]
+    [InlineData("Dune.2021.1080p.BluRay.HDR10+.x265", true)]
+    [InlineData("Dune: Prophecy [S01] (2024) WEB-DL 1080p | Dolby Vision Profile 8", true)]
+    [InlineData("Дюна / Dune (2021) HDRip 1080p | D", false)]
+    public void DetectsHdr(string title, bool isHdr)
+    {
+        Assert.Equal(isHdr, ReleaseParser.Parse(title).IsHdr);
+    }
+
+    [Fact]
+    public void TolokaTrackCount()
+    {
+        var release = ReleaseParser.Parse("Dune: Part Two (2024) BDRip 1080p H.265 2xUkr/Eng | sub 2xUkr/Eng", defaultLanguage: "ukr");
+
+        Assert.Equal([new ReleaseAudio("ukr", VoiceType.Dub), new ReleaseAudio("eng", VoiceType.Original)], release.Audio);
+        Assert.Equal(["ukr", "eng"], release.Subtitles);
+    }
+
     [Fact]
     public void TolokaSeasonInUkrainian()
     {

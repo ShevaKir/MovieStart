@@ -10,6 +10,10 @@ public sealed record ProwlarrRelease
     [JsonPropertyName("title")]
     public string Title { get; init; } = string.Empty;
 
+    /// <summary>Stable id of the release; unlike <see cref="DownloadUrl"/> it is the same in every search.</summary>
+    [JsonPropertyName("guid")]
+    public string? Guid { get; init; }
+
     [JsonPropertyName("indexer")]
     public string Indexer { get; init; } = string.Empty;
 
@@ -38,19 +42,22 @@ public sealed record ProwlarrRelease
 
 public interface IProwlarrClient
 {
-    /// <param name="categories">Newznab categories: 2000 movies, 5000 TV.</param>
+    /// <param name="categories">Newznab category: 2000 movies, 5000 TV.</param>
     Task<IReadOnlyList<ProwlarrRelease>> SearchAsync(string query, int categories, CancellationToken cancellationToken);
 }
 
 public sealed class ProwlarrClient(HttpClient http, IOptions<ProwlarrOptions> options) : IProwlarrClient
 {
+    private const int OtherCategory = 8000;
+
     public async Task<IReadOnlyList<ProwlarrRelease>> SearchAsync(string query, int categories, CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(options.Value.ApiKey))
             throw new SearchUnavailableException("Prowlarr is not configured: set Prowlarr:ApiKey.");
 
+        // RuTor files every search result under "Other" (8000); without it they would all be dropped.
         var url = new Uri(new Uri(options.Value.BaseUrl),
-            $"/api/v1/search?type=search&limit=100&categories={categories}&query={Uri.EscapeDataString(query)}");
+            $"/api/v1/search?type=search&limit=100&categories={categories}&categories={OtherCategory}&query={Uri.EscapeDataString(query)}");
         using var request = new HttpRequestMessage(HttpMethod.Get, url);
         request.Headers.Add("X-Api-Key", options.Value.ApiKey);
 

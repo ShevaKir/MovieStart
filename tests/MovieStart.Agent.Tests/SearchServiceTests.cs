@@ -184,6 +184,28 @@ public class SearchServiceTests
         Assert.Equal("Shogun.S02E03.1080p.WEB-DL", request.ReleaseTitle);
     }
 
+    [Fact]
+    public async Task MergesTheSameReleaseFoundByDifferentQueries()
+    {
+        _prowlarr.AddProxied("Dune.2021.1080p.BluRay.x265", guid: "https://toloka.to/t1");
+
+        var releases = await _search.SearchReleasesAsync(Dune, Token);
+
+        Assert.Equal(2, _prowlarr.Queries.Count);
+        Assert.Single(releases);
+    }
+
+    [Fact]
+    public async Task SkipsStereo3D()
+    {
+        _prowlarr.Add("Dune.2021.1080p.BluRay.x265", seeders: 10);
+        _prowlarr.Add("3D/ Dune (2021) BDRip 1080p 3D H.265", seeders: 10);
+
+        var releases = await _search.SearchReleasesAsync(Dune, Token);
+
+        Assert.Equal(["Dune.2021.1080p.BluRay.x265"], releases.Select(r => r.Title));
+    }
+
     private sealed class FakeProwlarr : IProwlarrClient
     {
         private readonly List<ProwlarrRelease> _releases = [];
@@ -201,10 +223,25 @@ public class SearchServiceTests
                 MagnetUrl = $"magnet:?xt=urn:btih:{_releases.Count:x40}",
             });
 
+        /// <summary>A .torrent behind a Prowlarr proxy link, which differs on every search.</summary>
+        public void AddProxied(string title, string guid) =>
+            _releases.Add(new ProwlarrRelease
+            {
+                Title = title,
+                Guid = guid,
+                Seeders = 10,
+                Size = 6 * Gb,
+                Indexer = "Toloka.to",
+                Protocol = "torrent",
+            });
+
         public Task<IReadOnlyList<ProwlarrRelease>> SearchAsync(string query, int categories, CancellationToken cancellationToken)
         {
             Queries.Add(query);
-            return Task.FromResult<IReadOnlyList<ProwlarrRelease>>(_releases);
+            var search = Queries.Count;
+            return Task.FromResult<IReadOnlyList<ProwlarrRelease>>(_releases
+                .Select(release => release.MagnetUrl is null ? release with { DownloadUrl = $"http://prowlarr/download?search={search}" } : release)
+                .ToList());
         }
     }
 

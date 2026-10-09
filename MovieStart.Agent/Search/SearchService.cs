@@ -37,7 +37,8 @@ public sealed partial class SearchService(ITmdbClient tmdb, IProwlarrClient prow
         return results
             .SelectMany(releases => releases)
             .Where(release => release.Protocol is null or "torrent")
-            .DistinctBy(release => release.MagnetUrl ?? release.DownloadUrl ?? release.Title)
+            // Download links are per-search Prowlarr proxy URLs, so the same release differs between queries.
+            .DistinctBy(release => release.Guid ?? release.InfoUrl ?? release.MagnetUrl ?? release.DownloadUrl ?? release.Title)
             .Select(ToReleaseInfo)
             .OfType<ReleaseInfo>()
             .Where(release => IsWanted(release, search))
@@ -132,6 +133,8 @@ public sealed partial class SearchService(ITmdbClient tmdb, IProwlarrClient prow
         var warnings = new List<string>();
         if (parsed.Source == ReleaseSource.Remux)
             warnings.Add("Untouched Blu-ray: about 4× the size of a good rip.");
+        if (parsed.IsHdr)
+            warnings.Add("HDR: colors look washed out on the SDR TV.");
         if (parsed.SeasonFrom is null && size is > 0 and < 1536L * 1024 * 1024)
             warnings.Add("Small for 1080p: likely low quality.");
         return warnings;
@@ -141,6 +144,10 @@ public sealed partial class SearchService(ITmdbClient tmdb, IProwlarrClient prow
     {
         // The TV is 1080p; 4K only costs disk space and 720p looks worse.
         if (release.Resolution != TargetResolution || release.Source == ReleaseSource.Cam || release.Seeders <= 0)
+            return false;
+
+        // Stereo 3D (side-by-side) is unwatchable on a regular TV.
+        if (StereoThreeD().IsMatch(release.Title))
             return false;
 
         // A season pack is not a movie.
@@ -182,6 +189,9 @@ public sealed partial class SearchService(ITmdbClient tmdb, IProwlarrClient prow
 
     [GeneratedRegex(@"[^\p{L}\p{N}]+")]
     private static partial Regex NonWord();
+
+    [GeneratedRegex(@"\b3D\b", RegexOptions.IgnoreCase)]
+    private static partial Regex StereoThreeD();
 
     [GeneratedRegex(@"(?<!\d)(?:19|20)\d{2}(?!\d)")]
     private static partial Regex YearPattern();
