@@ -22,5 +22,6 @@ MovieStart — a Mac app (Avalonia, .NET 10) plus an agent on a Raspberry Pi 5 (
 
 ## UI
 
+- App UI language: English. Search must accept queries in Russian, Ukrainian and English.
 - Light theme, green accent `#18794E`. Yellow is for warnings only.
 - Mockups: https://claude.ai/artifact/HvoKQhLp5Rc7ihU1KTyNZH

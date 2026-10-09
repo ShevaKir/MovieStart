@@ -2,7 +2,7 @@
 
 A Mac desktop app that finds movies, downloads them to a Raspberry Pi 5, and plays them on a TV connected to the Pi over HDMI.
 
-> Status: early stage — solution skeleton with an agent health check.
+> Status: early stage — agent health check and mpv player control are in place; downloads and search are next.
 
 ## How it works
 

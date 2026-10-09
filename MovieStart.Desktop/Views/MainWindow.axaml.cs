@@ -5,6 +5,9 @@ namespace MovieStart.Desktop.Views;
 
 public partial class MainWindow : Window
 {
+    private static readonly TimeSpan HealthInterval = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan PlayerInterval = TimeSpan.FromSeconds(1);
+
     private readonly CancellationTokenSource _polling = new();
 
     public MainWindow()
@@ -16,7 +19,10 @@ public partial class MainWindow : Window
     {
         base.OnOpened(e);
         if (DataContext is MainWindowViewModel viewModel)
-            _ = PollAsync(viewModel);
+        {
+            _ = PollAsync(token => viewModel.RunPollingAsync(HealthInterval, token));
+            _ = PollAsync(token => viewModel.Player.RunPollingAsync(PlayerInterval, token));
+        }
     }
 
     protected override void OnClosed(EventArgs e)
@@ -25,11 +31,11 @@ public partial class MainWindow : Window
         base.OnClosed(e);
     }
 
-    private async Task PollAsync(MainWindowViewModel viewModel)
+    private async Task PollAsync(Func<CancellationToken, Task> poll)
     {
         try
         {
-            await viewModel.RunPollingAsync(TimeSpan.FromSeconds(5), _polling.Token);
+            await poll(_polling.Token);
         }
         catch (OperationCanceledException)
         {

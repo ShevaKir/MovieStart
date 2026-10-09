@@ -17,9 +17,32 @@
     <Style Selector="Ellipse.status.offline">
       <Setter Property="Fill" Value="#C0392B" />
     </Style>
+    <Style Selector="TextBlock.muted">
+      <Setter Property="Foreground" Value="#6E6A63" />
+    </Style>
+    <Style Selector="TextBlock.error">
+      <Setter Property="Foreground" Value="#C0392B" />
+    </Style>
+    <Style Selector="Button.remote">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="MinWidth" Value="44" />
+      <Setter Property="MinHeight" Value="40" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="Button.primary">
+      <Setter Property="Width" Value="48" />
+      <Setter Property="Height" Value="48" />
+      <Setter Property="CornerRadius" Value="24" />
+      <Setter Property="Background" Value="#1C1B19" />
+      <Setter Property="Foreground" Value="#F6F5F2" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
   </Window.Styles>
 
   <DockPanel>
+    <!-- Header -->
     <Border DockPanel.Dock="Top" Background="White" BorderBrush="#E4E2DD" BorderThickness="0,0,0,1" Padding="24,16">
       <DockPanel>
         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
@@ -27,21 +50,85 @@
                    Classes="status"
                    Classes.online="{Binding IsOnline}"
                    Classes.offline="{Binding IsOffline}" />
-          <TextBlock Text="{Binding StatusText}" Foreground="#6E6A63" />
+          <TextBlock Text="{Binding StatusText}" Classes="muted" />
         </StackPanel>
         <TextBlock Text="MovieStart" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
       </DockPanel>
     </Border>
 
-    <StackPanel Margin="24" Spacing="8" MaxWidth="560" HorizontalAlignment="Left">
-      <TextBlock Text="Agent address" FontWeight="SemiBold" />
-      <DockPanel>
-        <Button DockPanel.Dock="Right" Margin="8,0,0,0"
-                Content="Check" Command="{Binding CheckConnectionCommand}" />
-        <TextBox Text="{Binding AgentUrl}" PlaceholderText="http://sheva-server.local:5080" />
-      </DockPanel>
-      <TextBlock Text="For local development run the agent on this Mac and use http://localhost:5080."
-                 Foreground="#6E6A63" FontSize="12" TextWrapping="Wrap" />
+    <!-- Remote control -->
+    <Border DockPanel.Dock="Bottom" Background="White" BorderBrush="#E4E2DD" BorderThickness="0,1,0,0" Padding="24,14"
+            DataContext="{Binding Player}" x:DataType="vm:PlayerViewModel">
+      <Grid ColumnDefinitions="2*,3*,2*" IsEnabled="{Binding IsConnected}">
+        <StackPanel Grid.Column="0" Spacing="3" VerticalAlignment="Center">
+          <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+          <TextBlock Classes="muted" FontSize="12" Text="On TV" IsVisible="{Binding HasMedia}" />
+          <TextBlock Classes="muted" FontSize="12" Text="Player is not running" IsVisible="{Binding !IsConnected}" />
+        </StackPanel>
+
+        <StackPanel Grid.Column="1" Spacing="6" IsEnabled="{Binding HasMedia}">
+          <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
+            <Button Classes="remote" Content="−30s" Command="{Binding SeekBackCommand}" ToolTip.Tip="Back 30 seconds" />
+            <Button Classes="primary" Command="{Binding TogglePauseCommand}" ToolTip.Tip="Play / pause">
+              <Panel>
+                <PathIcon Data="M8 5v14l11-7z" IsVisible="{Binding IsPaused}" />
+                <PathIcon Data="M6 4h4v16H6z M14 4h4v16h-4z" IsVisible="{Binding !IsPaused}" />
+              </Panel>
+            </Button>
+            <Button Classes="remote" Content="+30s" Command="{Binding SeekForwardCommand}" ToolTip.Tip="Forward 30 seconds" />
+            <Button Classes="remote" Command="{Binding StopCommand}" ToolTip.Tip="Stop">
+              <PathIcon Data="M6 6h12v12H6z" Width="14" Height="14" />
+            </Button>
+          </StackPanel>
+          <DockPanel>
+            <TextBlock DockPanel.Dock="Left" Classes="muted" FontSize="12" Text="{Binding PositionText}" VerticalAlignment="Center" Margin="0,0,10,0" />
+            <TextBlock DockPanel.Dock="Right" Classes="muted" FontSize="12" Text="{Binding DurationText}" VerticalAlignment="Center" Margin="10,0,0,0" />
+            <Slider Minimum="0" Maximum="{Binding Duration}" Value="{Binding Position}" />
+          </DockPanel>
+        </StackPanel>
+
+        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="12" HorizontalAlignment="Right" VerticalAlignment="Center"
+                    IsEnabled="{Binding HasMedia}">
+          <StackPanel Spacing="4">
+            <TextBlock Classes="muted" FontSize="11" Text="Audio" />
+            <ComboBox MinWidth="130" ItemsSource="{Binding AudioTracks}" SelectedItem="{Binding SelectedAudioTrack}" />
+          </StackPanel>
+          <StackPanel Spacing="4">
+            <TextBlock Classes="muted" FontSize="11" Text="Subtitles" />
+            <ComboBox MinWidth="100" ItemsSource="{Binding SubtitleTracks}" SelectedItem="{Binding SelectedSubtitleTrack}" />
+          </StackPanel>
+          <StackPanel Spacing="4">
+            <TextBlock Classes="muted" FontSize="11" Text="Volume" />
+            <Slider Width="96" Minimum="0" Maximum="100" Value="{Binding Volume}" />
+          </StackPanel>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- Content -->
+    <StackPanel Margin="24" Spacing="28" MaxWidth="620" HorizontalAlignment="Left">
+      <StackPanel Spacing="8">
+        <TextBlock Text="Agent address" FontWeight="SemiBold" />
+        <DockPanel>
+          <Button DockPanel.Dock="Right" Margin="8,0,0,0"
+                  Content="Check" Command="{Binding CheckConnectionCommand}" />
+          <TextBox Text="{Binding AgentUrl}" PlaceholderText="http://sheva-server.local:5080" />
+        </DockPanel>
+        <TextBlock Text="For local development run the agent on this Mac and use http://localhost:5080."
+                   Classes="muted" FontSize="12" TextWrapping="Wrap" />
+      </StackPanel>
+
+      <!-- Temporary until the library exists: play any file from the agent's media root. -->
+      <StackPanel Spacing="8" DataContext="{Binding Player}" x:DataType="vm:PlayerViewModel">
+        <TextBlock Text="Play a file on the TV" FontWeight="SemiBold" />
+        <DockPanel>
+          <Button DockPanel.Dock="Right" Margin="8,0,0,0"
+                  Content="Play" Command="{Binding PlayFileCommand}" IsEnabled="{Binding IsConnected}" />
+          <TextBox Text="{Binding FilePath}" PlaceholderText="/mnt/movies/Dune (2021)/Dune.mkv" />
+        </DockPanel>
+        <TextBlock Classes="error" FontSize="12" TextWrapping="Wrap"
+                   Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      </StackPanel>
     </StackPanel>
   </DockPanel>
 </Window>

@@ -10,4 +10,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="MovieStart.Agent.Tests" />
+  </ItemGroup>
+
 </Project>

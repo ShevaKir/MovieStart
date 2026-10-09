@@ -1,4 +1,3 @@
-using MovieStart.Desktop.Services;
 using MovieStart.Desktop.ViewModels;
 using MovieStart.Shared.Health;
 
@@ -9,7 +8,7 @@ public class MainWindowViewModelTests
     [Fact]
     public void StartsInCheckingState()
     {
-        var viewModel = new MainWindowViewModel(new FakeAgentClient(null), "http://pi.local:5080");
+        var viewModel = new MainWindowViewModel(new FakeAgentClient(), "http://pi.local:5080");
 
         Assert.Equal(ConnectionStatus.Checking, viewModel.Status);
         Assert.Equal("Checking…", viewModel.StatusText);
@@ -18,8 +17,8 @@ public class MainWindowViewModelTests
     [Fact]
     public async Task BecomesOnlineWhenAgentResponds()
     {
-        var viewModel = new MainWindowViewModel(
-            new FakeAgentClient(new HealthResponse("1.0.0", DateTimeOffset.UtcNow)), "http://pi.local:5080");
+        var agent = new FakeAgentClient { Health = new HealthResponse("1.0.0", DateTimeOffset.UtcNow) };
+        var viewModel = new MainWindowViewModel(agent, "http://pi.local:5080");
 
         await viewModel.CheckConnectionAsync(TestContext.Current.CancellationToken);
 
@@ -31,7 +30,7 @@ public class MainWindowViewModelTests
     [Fact]
     public async Task BecomesOfflineWhenAgentIsUnreachable()
     {
-        var viewModel = new MainWindowViewModel(new FakeAgentClient(null), "http://pi.local:5080");
+        var viewModel = new MainWindowViewModel(new FakeAgentClient(), "http://pi.local:5080");
 
         await viewModel.CheckConnectionAsync(TestContext.Current.CancellationToken);
 
@@ -42,25 +41,25 @@ public class MainWindowViewModelTests
     [Fact]
     public async Task ChecksTheCurrentAgentUrl()
     {
-        var agentClient = new FakeAgentClient(null);
-        var viewModel = new MainWindowViewModel(agentClient, "http://pi.local:5080")
+        var agent = new FakeAgentClient();
+        var viewModel = new MainWindowViewModel(agent, "http://pi.local:5080")
         {
             AgentUrl = "http://localhost:5080",
         };
 
         await viewModel.CheckConnectionAsync(TestContext.Current.CancellationToken);
 
-        Assert.Equal("http://localhost:5080", agentClient.LastAgentUrl);
+        Assert.Equal("http://localhost:5080", agent.LastAgentUrl);
     }
 
-    private sealed class FakeAgentClient(HealthResponse? health) : IAgentClient
+    [Fact]
+    public async Task PlayerUsesTheCurrentAgentUrl()
     {
-        public string? LastAgentUrl { get; private set; }
+        var agent = new FakeAgentClient();
+        var viewModel = new MainWindowViewModel(agent, "http://pi.local:5080") { AgentUrl = "http://localhost:5080" };
 
-        public Task<HealthResponse?> GetHealthAsync(string agentUrl, CancellationToken cancellationToken = default)
-        {
-            LastAgentUrl = agentUrl;
-            return Task.FromResult(health);
-        }
+        await viewModel.Player.RefreshAsync(TestContext.Current.CancellationToken);
+
+        Assert.Equal("http://localhost:5080", agent.LastAgentUrl);
     }
 }

@@ -23,7 +23,10 @@ public partial class MainWindowViewModel : ObservableObject
     {
         _agentClient = agentClient;
         _agentUrl = agentUrl;
+        Player = new PlayerViewModel(agentClient, () => AgentUrl);
     }
+
+    public PlayerViewModel Player { get; }
 
     public bool IsOnline => Status == ConnectionStatus.Online;
 
