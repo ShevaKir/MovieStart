@@ -123,6 +123,32 @@
                               </StackPanel>
                             </Grid>
                           </Border>
+                          <StackPanel Spacing="6" IsVisible="{Binding CanChooseEpisodes}">
+                            <Button Classes="link" Command="{Binding ToggleEpisodeChoiceCommand}" HorizontalAlignment="Left">
+                              <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBlock Text="{Binding EpisodesChosen}" FontSize="13" />
+                                <PathIcon Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" Width="12" Height="12" IsVisible="{Binding !IsChoosingEpisodes}" />
+                                <PathIcon Data="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" Width="12" Height="12" IsVisible="{Binding IsChoosingEpisodes}" />
+                              </StackPanel>
+                            </Button>
+                            <ItemsControl ItemsSource="{Binding Episodes}" IsVisible="{Binding IsChoosingEpisodes}">
+                              <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                  <WrapPanel />
+                                </ItemsPanelTemplate>
+                              </ItemsControl.ItemsPanel>
+                              <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:DownloadFileViewModel">
+                                  <CheckBox IsChecked="{Binding IsWanted}" MinWidth="170" Margin="0,0,12,0">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                      <TextBlock Text="{Binding Label}" FontSize="13" />
+                                      <TextBlock Classes="muted" FontSize="12" Text="{Binding Size}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                  </CheckBox>
+                                </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                          </StackPanel>
                         </StackPanel>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
@@ -141,24 +167,38 @@
                     <ItemsControl.ItemTemplate>
                       <DataTemplate x:DataType="vm:EpisodeViewModel">
                         <Border Classes="row">
-                          <Grid ColumnDefinitions="64,*,160,Auto" ColumnSpacing="14">
-                            <TextBlock Grid.Column="0" Text="{Binding Code}" FontWeight="SemiBold" VerticalAlignment="Center" />
-                            <TextBlock Grid.Column="1" Text="{Binding Name}" Classes="muted" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                            <StackPanel Grid.Column="2" Spacing="4" VerticalAlignment="Center">
-                              <ProgressBar Minimum="0" Maximum="100" Value="{Binding WatchedPercent}" />
-                              <TextBlock Classes="muted" FontSize="11" Text="{Binding Remaining}"
-                                         IsVisible="{Binding Remaining, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                              <TextBlock Classes="muted" FontSize="11" Text="Watched" IsVisible="{Binding IsWatched}" />
-                            </StackPanel>
-                            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
-                              <Button Classes="mini" Command="{Binding PlayCommand}" ToolTip.Tip="Play">
-                                <PathIcon Data="M8 5v14l11-7z" Width="12" Height="12" />
-                              </Button>
-                              <Button Classes="mini" Command="{Binding PlayFromStartCommand}" ToolTip.Tip="Play from the start">
-                                <PathIcon Data="M6 6h2v12H6zm3.5 6 8.5 6V6z" Width="12" Height="12" />
-                              </Button>
-                            </StackPanel>
-                          </Grid>
+                          <StackPanel Spacing="8">
+                            <Grid ColumnDefinitions="64,*,160,Auto" ColumnSpacing="14">
+                              <TextBlock Grid.Column="0" Text="{Binding Code}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                              <TextBlock Grid.Column="1" Text="{Binding Name}" Classes="muted" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                              <StackPanel Grid.Column="2" Spacing="4" VerticalAlignment="Center">
+                                <ProgressBar Minimum="0" Maximum="100" Value="{Binding WatchedPercent}" />
+                                <TextBlock Classes="muted" FontSize="11" Text="{Binding Remaining}"
+                                           IsVisible="{Binding Remaining, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                <TextBlock Classes="muted" FontSize="11" Text="Watched" IsVisible="{Binding IsWatched}" />
+                              </StackPanel>
+                              <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                                <Button Classes="mini" Command="{Binding PlayCommand}" ToolTip.Tip="Play">
+                                  <PathIcon Data="M8 5v14l11-7z" Width="12" Height="12" />
+                                </Button>
+                                <Button Classes="mini" Command="{Binding PlayFromStartCommand}" ToolTip.Tip="Play from the start">
+                                  <PathIcon Data="M6 6h2v12H6zm3.5 6 8.5 6V6z" Width="12" Height="12" />
+                                </Button>
+                                <Button Classes="mini" Command="{Binding AskDeleteCommand}" ToolTip.Tip="Delete this episode">
+                                  <PathIcon Data="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" Width="12" Height="12" />
+                                </Button>
+                              </StackPanel>
+                            </Grid>
+                            <Border IsVisible="{Binding IsConfirmingDelete}" Background="#FBEAE8" CornerRadius="8" Padding="14,10">
+                              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                <TextBlock Foreground="#8A2A22" VerticalAlignment="Center" TextWrapping="Wrap" Text="{Binding DeleteQuestion}" />
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                  <Button Content="Cancel" Command="{Binding CancelDeleteCommand}" />
+                                  <Button Classes="danger" Content="Delete" Command="{Binding ConfirmDeleteCommand}" />
+                                </StackPanel>
+                              </Grid>
+                            </Border>
+                          </StackPanel>
                         </Border>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>

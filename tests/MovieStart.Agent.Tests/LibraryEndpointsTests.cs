@@ -101,6 +101,31 @@ public sealed class LibraryEndpointsTests : IDisposable
     }
 
     [Fact]
+    public async Task ChoosingFilesBeforeTheFileListIsKnownIsAConflict()
+    {
+        using var client = _factory.CreateClient();
+        var created = await (await client.PostAsJsonAsync(ApiRoutes.Library, new AddToLibraryRequest(MediaKind.Series, "Shogun", Magnet, Season: 1), Token))
+            .Content.ReadFromJsonAsync<LibraryItem>(Token);
+
+        var response = await client.PutAsJsonAsync(
+            ApiRoutes.LibraryDownloadFiles(created!.Id, created.Downloads[0].Id), new SelectFilesRequest([0]), Token);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task DeletingAnUnknownFileIsNotFound()
+    {
+        using var client = _factory.CreateClient();
+        var created = await (await client.PostAsJsonAsync(ApiRoutes.Library, new AddToLibraryRequest(MediaKind.Movie, "Dune", Magnet), Token))
+            .Content.ReadFromJsonAsync<LibraryItem>(Token);
+
+        var response = await client.DeleteAsync(ApiRoutes.LibraryFile(created!.Id, 7), Token);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
     public async Task PosterIsStoredWithTheItemAndDeletedWithIt()
     {
         using var client = _factory.CreateClient();

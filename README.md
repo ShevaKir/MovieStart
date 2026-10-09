@@ -30,9 +30,10 @@ Mac (MovieStart.Desktop)                Raspberry Pi 5 (sheva-server.local)
 - Release ranking: voice-over profile → source (BDRip > WEB-DL > WEBRip) → MKV → x265 10-bit → seeders.
 - Filters by audio language (UKR / RUS / ENG) and voice-over type (dub, multi-voice, single-voice author, original).
 - Voice-over profile (e.g. Ukrainian dub → Russian dub → English original): ranks releases and picks the audio track on playback; subtitles follow (forced ones with a dub, full ones with the original). Tracks are read with ffprobe.
-- Series: download a whole series, a season or single episodes; they are merged into one episode list.
+- Series: download a whole series, a season or single episodes; they are merged into one episode list. While a season downloads, untick episodes to skip them; a watched episode can be deleted on its own and is not downloaded again.
+- Samples, trailers and extras inside torrents are skipped automatically.
 - Continue watching: the position of every file is remembered; "Continue" resumes the last episode or moves to the next one.
-- Pi disk usage, deletion of whole items or single downloads, free-space check before a download starts.
+- Pi disk usage, deletion of whole items, single downloads or single episodes, free-space check before a download starts.
 - No database: each item keeps its metadata in `item.json` next to its files on the movies disk.
 
 ## Structure

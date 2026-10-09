@@ -433,6 +433,141 @@ public sealed class LibraryServiceTests : IDisposable
         Assert.Equal(new PlaybackOptions(), _player.PlayedOptions);
     }
 
+    [Fact]
+    public async Task FileListArrivesWithMetadataAndSkipsSamples()
+    {
+        await _library.AddAsync(Series(season: 1), Token);
+        _qbit.Appear("h1", state: "metaDL");
+        _qbit.Files["h1"] = SeasonFiles();
+
+        await _library.SyncAsync(Token);
+        Assert.Null(_library.List()[0].Downloads[0].Files);
+
+        _qbit.Update("h1", torrent => torrent with { State = "downloading", Progress = 0.1 });
+        await _library.SyncAsync(Token);
+
+        var files = _library.List()[0].Downloads[0].Files!;
+        Assert.Equal(["S01E01", "S01E02", "S01E03", null], files.Select(file => file.EpisodeCode));
+        Assert.Equal([true, true, true, false], files.Select(file => file.Wanted));
+        Assert.Equal(["h1:3=0"], _qbit.PriorityChanges);
+    }
+
+    [Fact]
+    public async Task ChosenEpisodesAreTheOnlyOnesInTheLibrary()
+    {
+        var series = await AddRunningSeasonAsync();
+        var download = series.Downloads[0];
+
+        await _library.SelectFilesAsync(series.Id, download.Id, new SelectFilesRequest([0, 2]), Token);
+
+        Assert.Equal([true, false, true, false], _library.List()[0].Downloads[0].Files!.Select(file => file.Wanted));
+        Assert.Equal([true, false, true, false], _qbit.Files["h1"].Select(file => file.IsWanted));
+
+        _qbit.Update("h1", torrent => torrent with { State = "uploading", Progress = 1 });
+        await _library.SyncAsync(Token);
+
+        Assert.Equal(["S01E01", "S01E03"], _library.List()[0].Files.Select(file => file.EpisodeCode));
+    }
+
+    [Fact]
+    public async Task DroppedEpisodeIsFreedAndARestoredOneIsRechecked()
+    {
+        var series = await AddRunningSeasonAsync();
+        var download = series.Downloads[0];
+        var episode2 = Path.Combine(_store.GetDownloadDirectory(series.Id, download.Id), "Shogun.S01/Shogun.S01E02.mkv");
+        Directory.CreateDirectory(Path.GetDirectoryName(episode2)!);
+        await File.WriteAllTextAsync(episode2, "partial", Token);
+
+        await _library.SelectFilesAsync(series.Id, download.Id, new SelectFilesRequest([0, 2]), Token);
+
+        Assert.False(File.Exists(episode2));
+        Assert.Empty(_qbit.Rechecked);
+
+        await _library.SelectFilesAsync(series.Id, download.Id, new SelectFilesRequest([0, 1, 2]), Token);
+
+        Assert.Equal(["h1"], _qbit.Rechecked);
+    }
+
+    [Fact]
+    public async Task ChoosingNeedsAVideoFile()
+    {
+        var series = await AddRunningSeasonAsync();
+
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => _library.SelectFilesAsync(series.Id, series.Downloads[0].Id, new SelectFilesRequest([]), Token));
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => _library.SelectFilesAsync(series.Id, series.Downloads[0].Id, new SelectFilesRequest([0, 9]), Token));
+    }
+
+    [Fact]
+    public async Task ChoosingFilesOfAFinishedDownloadIsRefused()
+    {
+        var series = await AddReadySeasonAsync();
+
+        await Assert.ThrowsAsync<LibraryStateException>(
+            () => _library.SelectFilesAsync(series.Id, series.Downloads[0].Id, new SelectFilesRequest([0]), Token));
+    }
+
+    [Fact]
+    public async Task DeletedEpisodeIsSkippedSoItIsNotFetchedAgain()
+    {
+        var series = await AddReadySeasonAsync();
+        var episode = series.Files[1];
+        Directory.CreateDirectory(Path.GetDirectoryName(PathOf(series, episode))!);
+        await File.WriteAllTextAsync(PathOf(series, episode), "video", Token);
+
+        await _library.DeleteFileAsync(series.Id, episode.Id, Token);
+
+        var after = Assert.Single(_library.List());
+        Assert.Equal(["S01E01", "S01E03"], after.Files.Select(file => file.EpisodeCode));
+        Assert.Single(after.Downloads);
+        Assert.False(File.Exists(PathOf(series, episode)));
+        Assert.Equal(["h1:1=0"], _qbit.PriorityChanges);
+        Assert.Empty(_qbit.Deleted);
+    }
+
+    [Fact]
+    public async Task DeletingThePlayingEpisodeStopsItAndForgetsIt()
+    {
+        var series = await AddReadySeasonAsync();
+        await _library.PlayAsync(series.Id, new PlayItemRequest(series.Files[0].Id), Token);
+        _player.State = new PlayerState { IsConnected = true, IsIdle = false, FilePath = PathOf(series, series.Files[0]) };
+
+        await _library.DeleteFileAsync(series.Id, series.Files[0].Id, Token);
+
+        Assert.Equal(PlayerCommand.Stop(), _player.LastCommand);
+        Assert.Null(_library.List()[0].LastPlayedFileId);
+    }
+
+    [Fact]
+    public async Task DeletingTheLastEpisodeTakesTheDownloadWithIt()
+    {
+        var series = await AddReadySeasonAsync();
+
+        foreach (var file in series.Files)
+            await _library.DeleteFileAsync(series.Id, file.Id, Token);
+
+        Assert.Empty(_library.List());
+        Assert.Equal([("h1", true)], _qbit.Deleted);
+    }
+
+    private static List<QbitFile> SeasonFiles() =>
+    [
+        new QbitFile { Name = "Shogun.S01/Shogun.S01E01.mkv", Size = 2 * Gb },
+        new QbitFile { Name = "Shogun.S01/Shogun.S01E02.mkv", Size = 2 * Gb },
+        new QbitFile { Name = "Shogun.S01/Shogun.S01E03.mkv", Size = 2 * Gb },
+        new QbitFile { Name = "Shogun.S01/Sample/Shogun.S01E01.mkv", Size = 40_000_000 },
+    ];
+
+    private async Task<LibraryItem> AddRunningSeasonAsync()
+    {
+        await _library.AddAsync(Series(season: 1), Token);
+        _qbit.Appear("h1", progress: 0.1);
+        _qbit.Files["h1"] = SeasonFiles();
+        await _library.SyncAsync(Token);
+        return _library.List().Single();
+    }
+
     private async Task<LibraryItem> AddReadySeasonAsync()
     {
         await _library.AddAsync(Series(season: 1), Token);

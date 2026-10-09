@@ -88,7 +88,10 @@ public partial class LibraryItemViewModel : ObservableObject, IKeyed<Guid>
         Item = item;
         CollectionSync.Sync(Downloads, item.Downloads, d => d.Id, d => new DownloadViewModel(_library, item.Id, d), (vm, d) => vm.Update(d));
         foreach (var download in Downloads)
+        {
             download.CanDelete = item.Kind == MediaKind.Series || Downloads.Count > 1;
+            download.IsSeries = item.Kind == MediaKind.Series;
+        }
         CollectionSync.Sync(
             Episodes,
             item.Kind == MediaKind.Series ? item.Files : [],

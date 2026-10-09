@@ -194,6 +194,50 @@ public class LibraryViewModelTests
     }
 
     [Fact]
+    public async Task UntickedEpisodeIsSkippedWhileOtherFilesKeepTheirState()
+    {
+        var download = new LibraryDownload
+        {
+            Id = Guid.NewGuid(),
+            Season = 1,
+            Status = DownloadStatus.Downloading,
+            Files =
+            [
+                new DownloadFile(0, "S01/E01.mkv", 2 * Gb, Wanted: true, IsVideo: true, Season: 1, Episode: 1),
+                new DownloadFile(1, "S01/E02.mkv", 2 * Gb, Wanted: true, IsVideo: true, Season: 1, Episode: 2),
+                new DownloadFile(2, "S01/E03.mkv", 2 * Gb, Wanted: true, IsVideo: true, Season: 1, Episode: 3),
+                new DownloadFile(3, "S01/Subs/E01.srt", 1_000, Wanted: true),
+                new DownloadFile(4, "S01/Sample/E01.mkv", 1_000, Wanted: false),
+            ],
+        };
+        var item = new LibraryItemViewModel(_library, Series(null) with { Downloads = [download] });
+        var row = Assert.Single(item.Downloads);
+
+        Assert.True(row.CanChooseEpisodes);
+        Assert.Equal(["S01E01", "S01E02", "S01E03"], row.Episodes.Select(episode => episode.Label));
+        Assert.Equal("Episodes: 3 of 3", row.EpisodesChosen);
+
+        row.Episodes[1].IsWanted = false;
+        await row.SendSelectionAsync();
+
+        Assert.Equal("Episodes: 2 of 3", row.EpisodesChosen);
+        Assert.Contains($"select {download.Id} 0,2,3", _agent.Calls);
+    }
+
+    [Fact]
+    public async Task EpisodeDeleteNeedsConfirmation()
+    {
+        var item = new LibraryItemViewModel(_library, Series(null, Episode(1), Episode(2)));
+        var episode = item.Episodes[1];
+
+        episode.AskDeleteCommand.Execute(null);
+        Assert.Empty(_agent.Calls);
+
+        await episode.ConfirmDeleteCommand.ExecuteAsync(null);
+        Assert.Equal($"delete file {episode.File.Id}", _agent.Calls[0]);
+    }
+
+    [Fact]
     public void DownloadRowsDescribeProgress()
     {
         var download = new LibraryDownload
@@ -205,12 +249,13 @@ public class LibraryViewModelTests
             Progress = 0.68,
             DownloadSpeed = 13_002_342,
             EtaSeconds = 250,
+            SizeBytes = 10L * Gb,
         };
 
         var row = new DownloadViewModel(_library, Guid.NewGuid(), download);
 
         Assert.Equal("S02E01", row.Label);
-        Assert.Equal("68% · 12.4 MB/s · 4 min left", row.StatusText);
+        Assert.Equal("68% · 6.8 / 10.0 GB · 12.4 MB/s · 4 min left", row.StatusText);
         Assert.True(row.IsRunning);
     }
 

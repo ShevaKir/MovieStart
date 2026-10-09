@@ -89,6 +89,12 @@ public partial class LibraryViewModel : ObservableObject
     public Task DeleteDownloadAsync(Guid itemId, Guid downloadId) =>
         RunAsync(() => _agentClient.DeleteDownloadAsync(_agentUrl(), itemId, downloadId));
 
+    public Task SelectDownloadFilesAsync(Guid itemId, Guid downloadId, IReadOnlyList<int> wanted) =>
+        RunAsync(() => _agentClient.SelectDownloadFilesAsync(_agentUrl(), itemId, downloadId, new SelectFilesRequest(wanted)));
+
+    public Task DeleteFileAsync(Guid itemId, int fileId) =>
+        RunAsync(() => _agentClient.DeleteFileAsync(_agentUrl(), itemId, fileId));
+
     public Task PauseDownloadAsync(Guid itemId, Guid downloadId) =>
         RunAsync(() => _agentClient.PauseDownloadAsync(_agentUrl(), itemId, downloadId));
 

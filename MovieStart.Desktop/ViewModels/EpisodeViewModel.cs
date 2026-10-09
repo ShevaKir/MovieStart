@@ -13,6 +13,9 @@ public partial class EpisodeViewModel(LibraryViewModel library, Guid itemId, Med
     [ObservableProperty]
     private bool _isLastPlayed;
 
+    [ObservableProperty]
+    private bool _isConfirmingDelete;
+
     public int Key => File.Id;
 
     public string Code => File.EpisodeCode ?? "—";
@@ -20,6 +23,8 @@ public partial class EpisodeViewModel(LibraryViewModel library, Guid itemId, Med
     public string Name => Path.GetFileNameWithoutExtension(File.Name);
 
     public bool IsWatched => File.Watched;
+
+    public string DeleteQuestion => $"Delete {File.EpisodeCode ?? Name} from the Pi? It will not be downloaded again.";
 
     /// <summary>0–100; how far the episode has been watched.</summary>
     public double WatchedPercent => File.Watched ? 100 : File.Duration > 0 ? File.Position / File.Duration * 100 : 0;
@@ -40,4 +45,17 @@ public partial class EpisodeViewModel(LibraryViewModel library, Guid itemId, Med
 
     [RelayCommand]
     private Task PlayFromStartAsync() => library.PlayAsync(itemId, new PlayItemRequest(File.Id, FromStart: true));
+
+    [RelayCommand]
+    private void AskDelete() => IsConfirmingDelete = true;
+
+    [RelayCommand]
+    private void CancelDelete() => IsConfirmingDelete = false;
+
+    [RelayCommand]
+    private Task ConfirmDeleteAsync()
+    {
+        IsConfirmingDelete = false;
+        return library.DeleteFileAsync(itemId, File.Id);
+    }
 }

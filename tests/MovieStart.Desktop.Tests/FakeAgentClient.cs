@@ -76,6 +76,13 @@ public sealed class FakeAgentClient : IAgentClient
     public Task<AgentResult> DeleteDownloadAsync(string agentUrl, Guid itemId, Guid downloadId, CancellationToken cancellationToken = default) =>
         Record($"delete {itemId}/{downloadId}");
 
+    public Task<AgentResult> SelectDownloadFilesAsync(
+        string agentUrl, Guid itemId, Guid downloadId, SelectFilesRequest request, CancellationToken cancellationToken = default) =>
+        Record($"select {downloadId} {string.Join(',', request.Wanted)}");
+
+    public Task<AgentResult> DeleteFileAsync(string agentUrl, Guid itemId, int fileId, CancellationToken cancellationToken = default) =>
+        Record($"delete file {fileId}");
+
     public Task<AgentResult> PauseDownloadAsync(string agentUrl, Guid itemId, Guid downloadId, CancellationToken cancellationToken = default) =>
         Record($"pause {downloadId}");
 

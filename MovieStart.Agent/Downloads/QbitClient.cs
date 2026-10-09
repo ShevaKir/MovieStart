@@ -19,6 +19,12 @@ public interface IQbitClient
     Task ResumeAsync(string hash, CancellationToken cancellationToken);
 
     Task DeleteAsync(string hash, bool deleteFiles, CancellationToken cancellationToken);
+
+    /// <summary>Re-hashes the data on disk, e.g. after files were deleted behind qBittorrent's back.</summary>
+    Task RecheckAsync(string hash, CancellationToken cancellationToken);
+
+    /// <param name="indexes">Torrent file indexes (<see cref="QbitFile.Index"/>).</param>
+    Task SetFilePriorityAsync(string hash, IReadOnlyCollection<int> indexes, int priority, CancellationToken cancellationToken);
 }
 
 public sealed class QbitUnavailableException(string message, Exception? inner = null) : Exception(message, inner);
@@ -26,6 +32,9 @@ public sealed class QbitUnavailableException(string message, Exception? inner = 
 /// <summary>qBittorrent WebUI API v2 client (https://github.com/qbittorrent/qBittorrent/wiki).</summary>
 public sealed class QbitClient(HttpClient http, IOptions<QbitOptions> options) : IQbitClient
 {
+    public const int SkipPriority = 0;
+    public const int NormalPriority = 1;
+
     private readonly SemaphoreSlim _loginLock = new(1, 1);
 
     public Task AddAsync(string source, string savePath, string tag, CancellationToken cancellationToken) =>
@@ -54,6 +63,15 @@ public sealed class QbitClient(HttpClient http, IOptions<QbitOptions> options) :
 
     public Task DeleteAsync(string hash, bool deleteFiles, CancellationToken cancellationToken) =>
         PostAsync("torrents/delete", cancellationToken, ("hashes", hash), ("deleteFiles", deleteFiles ? "true" : "false"));
+
+    public Task RecheckAsync(string hash, CancellationToken cancellationToken) =>
+        PostAsync("torrents/recheck", cancellationToken, ("hashes", hash));
+
+    public Task SetFilePriorityAsync(string hash, IReadOnlyCollection<int> indexes, int priority, CancellationToken cancellationToken) =>
+        indexes.Count == 0
+            ? Task.CompletedTask
+            : PostAsync("torrents/filePrio", cancellationToken,
+                ("hash", hash), ("id", string.Join('|', indexes)), ("priority", priority.ToString(System.Globalization.CultureInfo.InvariantCulture)));
 
     private async Task PostWithFallbackAsync(
         string method, string legacyMethod, CancellationToken cancellationToken, params (string Key, string Value)[] form)

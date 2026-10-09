@@ -34,7 +34,16 @@ public sealed class DemoQbitClient(DemoClipFactory clips, IOptions<DemoOptions> 
     }
 
     public Task<IReadOnlyList<QbitFile>> GetFilesAsync(string hash, CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<QbitFile>>(_torrents.TryGetValue(hash, out var torrent) ? torrent.Files : []);
+        Task.FromResult<IReadOnlyList<QbitFile>>(_torrents.TryGetValue(hash, out var torrent) ? torrent.Files.ToList() : []);
+
+    public Task RecheckAsync(string hash, CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public Task SetFilePriorityAsync(string hash, IReadOnlyCollection<int> indexes, int priority, CancellationToken cancellationToken)
+    {
+        if (_torrents.TryGetValue(hash, out var torrent))
+            torrent.SetPriority(indexes, priority);
+        return Task.CompletedTask;
+    }
 
     public Task PauseAsync(string hash, CancellationToken cancellationToken)
     {
@@ -96,7 +105,7 @@ public sealed class DemoQbitClient(DemoClipFactory clips, IOptions<DemoOptions> 
             DownloadSpeed = speed,
             Eta = running ? (long)((1 - progress) * Duration.TotalSeconds) : Library.LibraryService.QbitUnknownEta,
             State = state,
-            Size = torrent.Size,
+            Size = torrent.Files.Where(file => file.IsWanted).Sum(file => file.Size),
             SavePath = torrent.SavePath,
             Tags = torrent.Tag,
         };
@@ -105,7 +114,7 @@ public sealed class DemoQbitClient(DemoClipFactory clips, IOptions<DemoOptions> 
     private async Task WriteFilesAsync(DemoTorrent torrent)
     {
         var (audio, subtitles) = DemoClipFactory.TracksFor(new ReleaseInfoLike(torrent.Parsed.Audio, torrent.Parsed.Subtitles));
-        foreach (var file in torrent.Files)
+        foreach (var file in torrent.Files.Where(file => file.IsWanted))
             await clips.CreateAsync(Path.Combine(torrent.SavePath, file.Name), audio, subtitles, CancellationToken.None);
         logger.LogInformation("Demo download finished: {Title}", torrent.Title);
     }
@@ -129,8 +138,8 @@ public sealed class DemoQbitClient(DemoClipFactory clips, IOptions<DemoOptions> 
         {
             return
             [
-                new QbitFile { Name = $"{name}/{name}.mkv", Size = size - 50_000_000 },
-                new QbitFile { Name = $"{name}/Sample/sample.mkv", Size = 50_000_000 },
+                new QbitFile { Index = 0, Name = $"{name}/{name}.mkv", Size = size - 50_000_000 },
+                new QbitFile { Index = 1, Name = $"{name}/Sample/sample.mkv", Size = 50_000_000 },
             ];
         }
 
@@ -142,7 +151,7 @@ public sealed class DemoQbitClient(DemoClipFactory clips, IOptions<DemoOptions> 
         var files = (from season in Enumerable.Range(firstSeason, lastSeason - firstSeason + 1)
                      from episode in episodes
                      select $"{name}/Season {season}/{name}.S{season:00}E{episode:00}.mkv").ToList();
-        return files.Select(file => new QbitFile { Name = file, Size = size / files.Count }).ToList();
+        return files.Select((file, index) => new QbitFile { Index = index, Name = file, Size = size / files.Count }).ToList();
     }
 
     private sealed class DemoTorrent(
@@ -159,7 +168,14 @@ public sealed class DemoQbitClient(DemoClipFactory clips, IOptions<DemoOptions> 
         public string SavePath { get; } = savePath;
         public string Tag { get; } = tag;
         public long Size { get; } = size;
-        public List<QbitFile> Files { get; } = files;
+        public IReadOnlyList<QbitFile> Files
+        {
+            get
+            {
+                lock (_lock)
+                    return files.ToList();
+            }
+        }
         public ParsedRelease Parsed { get; } = parsed;
         public DateTimeOffset AddedAt { get; } = addedAt;
         public bool IsPaused { get; private set; }
@@ -194,6 +210,18 @@ public sealed class DemoQbitClient(DemoClipFactory clips, IOptions<DemoOptions> 
             {
                 IsPaused = false;
                 _runningSince = now - MetadataDelay;
+            }
+        }
+
+        public void SetPriority(IReadOnlyCollection<int> indexes, int priority)
+        {
+            lock (_lock)
+            {
+                for (var i = 0; i < files.Count; i++)
+                {
+                    if (indexes.Contains(files[i].Index))
+                        files[i] = files[i] with { Priority = priority };
+                }
             }
         }
 
