@@ -24,7 +24,7 @@ public partial class MainWindowViewModel : ObservableObject
         _agentClient = agentClient;
         _agentUrl = agentUrl;
         Player = new PlayerViewModel(agentClient, () => AgentUrl);
-        Library = new LibraryViewModel(agentClient, () => AgentUrl);
+        Library = new LibraryViewModel(agentClient, () => AgentUrl, posters);
         Search = new SearchViewModel(agentClient, () => AgentUrl, Library, posters);
         VoiceProfile = new VoiceProfileViewModel(agentClient, () => AgentUrl);
     }

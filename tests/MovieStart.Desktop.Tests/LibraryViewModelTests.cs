@@ -79,7 +79,7 @@ public class LibraryViewModelTests
 
     [Theory]
     [InlineData(null, 0, 0, false, "Watch S01E01")]
-    [InlineData(1, 600, 3000, false, "Continue S01E01 · 40:00 left")]
+    [InlineData(1, 600, 3000, false, "Continue S01E01 from 10:00")]
     [InlineData(1, 0, 0, false, "Continue S01E01")]
     [InlineData(1, 2900, 3000, true, "Next S01E02")]
     public void PlayButtonSaysWhatWillPlay(int? lastPlayed, double position, double duration, bool watched, string expected)
@@ -123,6 +123,27 @@ public class LibraryViewModelTests
         await item.Episodes[1].PlayFromStartCommand.ExecuteAsync(null);
 
         Assert.Equal(new PlayItemRequest(2, FromStart: true), _agent.PlayRequest);
+    }
+
+    [Theory]
+    [InlineData(1, 600, true)]
+    [InlineData(1, 0, false)]
+    [InlineData(null, 0, false)]
+    public void StartOverOnlyForAStoppedFile(int? lastPlayed, double position, bool expected)
+    {
+        var item = new LibraryItemViewModel(_library, Series(lastPlayed, Episode(1, position, 3000, false), Episode(2)));
+
+        Assert.Equal(expected, item.CanStartOver);
+    }
+
+    [Fact]
+    public async Task StartOverPlaysTheContinuedFileFromTheBeginning()
+    {
+        var item = new LibraryItemViewModel(_library, Series(1, Episode(1, 600, 3000, false), Episode(2)));
+
+        await item.StartOverCommand.ExecuteAsync(null);
+
+        Assert.Equal(new PlayItemRequest(1, FromStart: true), _agent.PlayRequest);
     }
 
     [Fact]

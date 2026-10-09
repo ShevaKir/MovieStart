@@ -157,6 +157,23 @@ public partial class PlayerViewModel : ObservableObject
     [RelayCommand]
     private Task StopAsync() => SendAsync(PlayerCommand.Stop());
 
+    /// <summary>Stops playback on the TV when the app closes; gives up quietly if the agent does not answer in time.</summary>
+    public async Task StopIfPlayingAsync(TimeSpan timeout)
+    {
+        if (!HasMedia)
+            return;
+
+        using var cancellation = new CancellationTokenSource(timeout);
+        try
+        {
+            await _agentClient.SendPlayerCommandAsync(_agentUrl(), PlayerCommand.Stop(), cancellation.Token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Closing must not hang on an unreachable Pi.
+        }
+    }
+
     partial void OnPositionChanged(double value)
     {
         if (_applyingState)

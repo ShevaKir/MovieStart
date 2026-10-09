@@ -11,7 +11,10 @@ public partial class MainWindow : Window
     private static readonly TimeSpan PlayerInterval = TimeSpan.FromSeconds(1);
     private static readonly TimeSpan LibraryInterval = TimeSpan.FromSeconds(2);
 
+    private static readonly TimeSpan StopOnCloseTimeout = TimeSpan.FromSeconds(2);
+
     private readonly CancellationTokenSource _polling = new();
+    private bool _stoppedPlayback;
 
     public MainWindow()
     {
@@ -53,6 +56,19 @@ public partial class MainWindow : Window
             _ = PollAsync(token => viewModel.Player.RunPollingAsync(PlayerInterval, token));
             _ = PollAsync(token => viewModel.Library.RunPollingAsync(LibraryInterval, token));
         }
+    }
+
+    /// <summary>Stops the movie on the TV first, so the player does not keep running on the Pi after the app is gone.</summary>
+    protected override async void OnClosing(WindowClosingEventArgs e)
+    {
+        base.OnClosing(e);
+        if (e.Cancel || _stoppedPlayback || DataContext is not MainWindowViewModel { Player.HasMedia: true } viewModel)
+            return;
+
+        e.Cancel = true;
+        _stoppedPlayback = true;
+        await viewModel.Player.StopIfPlayingAsync(StopOnCloseTimeout);
+        Close();
     }
 
     protected override void OnClosed(EventArgs e)

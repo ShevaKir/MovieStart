@@ -36,14 +36,18 @@ public partial class LibraryViewModel : ObservableObject
     [ObservableProperty]
     private string _newEpisode = string.Empty;
 
-    public LibraryViewModel(IAgentClient agentClient, Func<string> agentUrl)
+    public LibraryViewModel(IAgentClient agentClient, Func<string> agentUrl, IPosterLoader? posters = null)
     {
         _agentClient = agentClient;
         _agentUrl = agentUrl;
+        Posters = posters;
         Items.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsEmpty));
     }
 
     public ObservableCollection<LibraryItemViewModel> Items { get; } = [];
+
+    /// <summary>Null in tests; the cards then keep their initials.</summary>
+    internal IPosterLoader? Posters { get; }
 
     public bool IsEmpty => Items.Count == 0;
 
