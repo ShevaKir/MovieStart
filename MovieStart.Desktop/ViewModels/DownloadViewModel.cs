@@ -10,6 +10,15 @@ public partial class DownloadViewModel(LibraryViewModel library, Guid itemId, Li
     [ObservableProperty]
     private LibraryDownload _download = download;
 
+    /// <summary>
+    /// Only when the item has something left after it: a movie's single download goes with the whole item (the bin).
+    /// </summary>
+    [ObservableProperty]
+    private bool _canDelete;
+
+    [ObservableProperty]
+    private bool _isConfirmingDelete;
+
     public Guid Key => Download.Id;
 
     public string Label => Download switch
@@ -21,6 +30,10 @@ public partial class DownloadViewModel(LibraryViewModel library, Guid itemId, Li
 
     /// <summary>Full release name; long, so the view trims it.</summary>
     public string? ReleaseTitle => Download.ReleaseTitle;
+
+    public string DeleteQuestion => Download.Season is null
+        ? "Delete this release and its files from the Pi?"
+        : $"Delete {Label} and its files from the Pi?";
 
     public bool IsActive => Download.Status is DownloadStatus.Queued or DownloadStatus.Downloading or DownloadStatus.Paused;
 
@@ -61,5 +74,15 @@ public partial class DownloadViewModel(LibraryViewModel library, Guid itemId, Li
     private Task ResumeAsync() => library.ResumeDownloadAsync(itemId, Download.Id);
 
     [RelayCommand]
-    private Task DeleteAsync() => library.DeleteDownloadAsync(itemId, Download.Id);
+    private void AskDelete() => IsConfirmingDelete = true;
+
+    [RelayCommand]
+    private void CancelDelete() => IsConfirmingDelete = false;
+
+    [RelayCommand]
+    private Task ConfirmDeleteAsync()
+    {
+        IsConfirmingDelete = false;
+        return library.DeleteDownloadAsync(itemId, Download.Id);
+    }
 }

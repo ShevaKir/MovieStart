@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# Builds a self-contained MovieStart.app for Apple Silicon into dist/.
+set -euo pipefail
+
+root="$(cd "$(dirname "$0")/.." && pwd)"
+version="${MOVIESTART_VERSION:-1.0.0}"
+app="$root/dist/MovieStart.app"
+out="$root/MovieStart.Desktop/bin/publish-osx-arm64"
+
+rm -rf "$out" "$app"
+dotnet publish "$root/MovieStart.Desktop" -c Release -r osx-arm64 --self-contained -p:Version="$version" -o "$out"
+
+mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+# Release builds use the committed appsettings.json only, never personal overrides.
+rsync -a --exclude appsettings.Local.json --exclude '*.pdb' "$out/" "$app/Contents/MacOS/"
+cp "$root/MovieStart.Desktop/Assets/MovieStart.icns" "$app/Contents/Resources/"
+
+cat > "$app/Contents/Info.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleName</key><string>MovieStart</string>
+  <key>CFBundleDisplayName</key><string>MovieStart</string>
+  <key>CFBundleIdentifier</key><string>com.moviestart.desktop</string>
+  <key>CFBundleVersion</key><string>$version</string>
+  <key>CFBundleShortVersionString</key><string>$version</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleExecutable</key><string>MovieStart.Desktop</string>
+  <key>CFBundleIconFile</key><string>MovieStart</string>
+  <key>LSMinimumSystemVersion</key><string>12.0</string>
+  <key>NSHighResolutionCapable</key><true/>
+  <key>NSPrincipalClass</key><string>NSApplication</string>
+</dict>
+</plist>
+PLIST
+
+# Ad-hoc signature: enough to run locally on Apple Silicon.
+codesign --force --deep --sign - "$app"
+echo "Built $app"

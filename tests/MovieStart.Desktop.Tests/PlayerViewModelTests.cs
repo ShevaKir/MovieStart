@@ -92,6 +92,31 @@ public class PlayerViewModelTests
     }
 
     [Fact]
+    public async Task StalePollDoesNotUndoTogglePause()
+    {
+        _player.Apply(Playing with { IsPaused = false });
+
+        await _player.TogglePauseCommand.ExecuteAsync(null);
+        // The agent has not applied the pause yet.
+        _player.Apply(Playing with { IsPaused = false });
+        await _player.TogglePauseCommand.ExecuteAsync(null);
+
+        Assert.Equal([PlayerCommandType.Pause, PlayerCommandType.Resume], _agent.Commands.Select(command => command.Type));
+    }
+
+    [Fact]
+    public async Task StopIfPlayingStopsOnlyWhilePlaying()
+    {
+        await _player.StopIfPlayingAsync(TimeSpan.FromSeconds(1));
+        Assert.Empty(_agent.Commands);
+
+        _player.Apply(Playing);
+        await _player.StopIfPlayingAsync(TimeSpan.FromSeconds(1));
+
+        Assert.Equal([PlayerCommand.Stop()], _agent.Commands);
+    }
+
+    [Fact]
     public async Task SeekButtonsMoveThirtySeconds()
     {
         await _player.SeekBackCommand.ExecuteAsync(null);

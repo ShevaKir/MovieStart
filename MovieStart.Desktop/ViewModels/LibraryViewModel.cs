@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MovieStart.Desktop.Services;
+using MovieStart.Shared;
 using MovieStart.Shared.Library;
 
 namespace MovieStart.Desktop.ViewModels;
@@ -36,14 +37,22 @@ public partial class LibraryViewModel : ObservableObject
     [ObservableProperty]
     private string _newEpisode = string.Empty;
 
-    public LibraryViewModel(IAgentClient agentClient, Func<string> agentUrl)
+    public LibraryViewModel(IAgentClient agentClient, Func<string> agentUrl, IPosterLoader? posters = null)
     {
         _agentClient = agentClient;
         _agentUrl = agentUrl;
+        Posters = posters;
         Items.CollectionChanged += (_, _) => OnPropertyChanged(nameof(IsEmpty));
     }
 
     public ObservableCollection<LibraryItemViewModel> Items { get; } = [];
+
+    /// <summary>Null in tests; the cards then keep their initials.</summary>
+    internal IPosterLoader? Posters { get; }
+
+    /// <summary>Posters come from the agent, which keeps a copy next to the movie.</summary>
+    internal string? PosterUrl(Guid itemId) =>
+        Uri.TryCreate(_agentUrl(), UriKind.Absolute, out var agent) ? new Uri(agent, ApiRoutes.LibraryPoster(itemId)).ToString() : null;
 
     public bool IsEmpty => Items.Count == 0;
 

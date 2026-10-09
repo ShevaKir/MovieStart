@@ -59,6 +59,7 @@ public static partial class ReleaseParser
             ParseSource(title),
             ParseCodec(title),
             TenBit().IsMatch(title),
+            Hdr().IsMatch(title),
             Container().Match(title) is { Success: true } container ? container.Value.ToUpperInvariant() : null,
             ParseAudio(audioText, defaultLanguage),
             ParseSubtitles(subtitles),
@@ -161,7 +162,7 @@ public static partial class ReleaseParser
             }
         }
 
-        // Toloka: "Ukr/Eng" with no voice types at all.
+        // Toloka: "Ukr/Eng" or "2xUkr/Eng" with no voice types at all.
         if (tracks.Count == 0 && LanguageList().Match(title) is { Success: true } list)
         {
             foreach (var language in list.Value.Split('/').Select(ToLanguage).OfType<string>())
@@ -254,7 +255,9 @@ public static partial class ReleaseParser
         _ => VoiceType.Dub,
     };
 
-    private static string? ToLanguage(string token) => LanguageCodes.GetValueOrDefault(token.Trim().TrimEnd('.'));
+    // "2xUkr" is two Ukrainian tracks; the count is dropped.
+    private static string? ToLanguage(string token) =>
+        LanguageCodes.GetValueOrDefault(TrackCount().Replace(token.Trim().TrimEnd('.'), string.Empty));
 
     [GeneratedRegex(@"\b(?<r>2160|1080|720|576|480)[pi]\b", RegexOptions.IgnoreCase)]
     private static partial Regex Resolution();
@@ -298,6 +301,10 @@ public static partial class ReleaseParser
     [GeneratedRegex(@"\b10[- ]?bit\b", RegexOptions.IgnoreCase)]
     private static partial Regex TenBit();
 
+    // Not "HDRip", which is an SDR rip.
+    [GeneratedRegex(@"\b(?:HDR(?:10\+?)?|Dolby\s*Vision|DoVi)(?![\w+])", RegexOptions.IgnoreCase)]
+    private static partial Regex Hdr();
+
     [GeneratedRegex(@"\b(?:MKV|MP4|AVI)\b", RegexOptions.IgnoreCase)]
     private static partial Regex Container();
 
@@ -316,11 +323,14 @@ public static partial class ReleaseParser
     [GeneratedRegex(@"\|\s*(?<codes>(?:[DPAL][12]?)(?:\s*,\s*[DPAL][12]?)*)\s*(?=\||$)")]
     private static partial Regex KinozalCodes();
 
-    [GeneratedRegex(@"\b(?:Ukr|Rus|Eng)(?:/(?:Ukr|Rus|Eng))+\b", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\b(?:\d+x)?(?:Ukr|Rus|Eng)(?:/(?:\d+x)?(?:Ukr|Rus|Eng))+\b", RegexOptions.IgnoreCase)]
     private static partial Regex LanguageList();
 
-    [GeneratedRegex(@"\bSub(?:s|titles)?\b\s*[:(]?\s*(?<langs>(?:(?:Rus|Eng|Ukr)\b[\s,/]*)+)", RegexOptions.IgnoreCase)]
+    [GeneratedRegex(@"\bSub(?:s|titles)?\b\s*[:(]?\s*(?<langs>(?:(?:\d+x)?(?:Rus|Eng|Ukr)\b[\s,/]*)+)", RegexOptions.IgnoreCase)]
     private static partial Regex Subtitles();
+
+    [GeneratedRegex(@"^\d+x", RegexOptions.IgnoreCase)]
+    private static partial Regex TrackCount();
 
     [GeneratedRegex(@"\s+Studio$", RegexOptions.IgnoreCase)]
     private static partial Regex StudioSuffix();
@@ -344,6 +354,7 @@ public sealed record ParsedRelease(
     ReleaseSource Source,
     string? Codec,
     bool Is10Bit,
+    bool IsHdr,
     string? Container,
     IReadOnlyList<ReleaseAudio> Audio,
     IReadOnlyList<string> Subtitles,

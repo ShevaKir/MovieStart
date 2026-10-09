@@ -9,3 +9,6 @@ docs/
 
 # Local development overrides
 appsettings.Local.json
+
+# Release builds
+dist/

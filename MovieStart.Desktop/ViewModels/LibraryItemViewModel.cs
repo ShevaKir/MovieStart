@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
+using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MovieStart.Desktop.Services;
 using MovieStart.Shared.Library;
 
 namespace MovieStart.Desktop.ViewModels;
@@ -13,6 +15,9 @@ public partial class LibraryItemViewModel : ObservableObject, IKeyed<Guid>
     private LibraryItem _item;
 
     [ObservableProperty]
+    private Bitmap? _poster;
+
+    [ObservableProperty]
     private bool _isConfirmingDelete;
 
     [ObservableProperty]
@@ -23,6 +28,8 @@ public partial class LibraryItemViewModel : ObservableObject, IKeyed<Guid>
         _library = library;
         _item = item;
         Update(item);
+        if (item.PosterUrl is not null && library.Posters is { } posters && library.PosterUrl(item.Id) is { } url)
+            _ = LoadPosterAsync(posters, url);
     }
 
     public Guid Id => Item.Id;
@@ -40,7 +47,7 @@ public partial class LibraryItemViewModel : ObservableObject, IKeyed<Guid>
 
     public bool IsSeries => Item.Kind == MediaKind.Series;
 
-    /// <summary>First letters of the title; stands in for the poster.</summary>
+    /// <summary>First letters of the title; shown until the poster loads, or when there is none.</summary>
     public string Initials => string.Concat(Item.Title.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(word => word[0]));
 
     public ObservableCollection<DownloadViewModel> Downloads { get; } = [];
@@ -61,15 +68,16 @@ public partial class LibraryItemViewModel : ObservableObject, IKeyed<Guid>
             var episode = next.EpisodeCode is { } code ? $" {code}" : string.Empty;
             if (next.Id == Item.LastPlayedFileId)
             {
-                return next.Position > 0 && next.Duration > 0
-                    ? $"Continue{episode} · {Format.Duration(next.Duration - next.Position)} left"
-                    : $"Continue{episode}";
+                return next.Position > 0 ? $"Continue{episode} from {Format.Duration(next.Position)}" : $"Continue{episode}";
             }
 
             // The last played episode is finished, so another one is offered.
             return Item.LastPlayedFileId is not null && IsSeries ? $"Next{episode}" : $"Watch{episode}";
         }
     }
+
+    /// <summary>The file being continued was stopped partway, so it can also be restarted.</summary>
+    public bool CanStartOver => Item.ChooseFileToContinue() is { Position: > 0 } next && next.Id == Item.LastPlayedFileId;
 
     public string? EpisodesSummary => IsSeries && Item.Files.Count > 0
         ? $"{Item.Files.Count} episodes · {Item.Files.Count(file => file.Watched)} watched"
@@ -79,6 +87,8 @@ public partial class LibraryItemViewModel : ObservableObject, IKeyed<Guid>
     {
         Item = item;
         CollectionSync.Sync(Downloads, item.Downloads, d => d.Id, d => new DownloadViewModel(_library, item.Id, d), (vm, d) => vm.Update(d));
+        foreach (var download in Downloads)
+            download.CanDelete = item.Kind == MediaKind.Series || Downloads.Count > 1;
         CollectionSync.Sync(
             Episodes,
             item.Kind == MediaKind.Series ? item.Files : [],
@@ -90,6 +100,10 @@ public partial class LibraryItemViewModel : ObservableObject, IKeyed<Guid>
 
     [RelayCommand]
     private Task PlayAsync() => _library.PlayAsync(Id, new PlayItemRequest());
+
+    [RelayCommand]
+    private Task StartOverAsync() =>
+        Item.ChooseFileToContinue() is { } next ? _library.PlayAsync(Id, new PlayItemRequest(next.Id, FromStart: true)) : Task.CompletedTask;
 
     [RelayCommand]
     private void AskDelete() => IsConfirmingDelete = true;
@@ -106,4 +120,6 @@ public partial class LibraryItemViewModel : ObservableObject, IKeyed<Guid>
 
     [RelayCommand]
     private void ToggleEpisodes() => IsExpanded = !IsExpanded;
+
+    private async Task LoadPosterAsync(IPosterLoader posters, string url) => Poster = await posters.LoadAsync(url);
 }
