@@ -1,0 +1,174 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:MovieStart.Desktop.ViewModels"
+             x:Class="MovieStart.Desktop.Views.LibraryView"
+             x:DataType="vm:LibraryViewModel">
+  <DockPanel Margin="32,28,32,0">
+    <StackPanel DockPanel.Dock="Top" Spacing="16" Margin="0,0,0,16">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Classes="h1" Text="Library" VerticalAlignment="Center" />
+        <Button Grid.Column="1" Content="Add by magnet" Command="{Binding ToggleAddFormCommand}" />
+      </Grid>
+
+      <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap"
+                 IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+      <!-- For releases found elsewhere; search is the usual way in. -->
+      <Border Classes="card" IsVisible="{Binding IsAddFormOpen}">
+        <StackPanel Spacing="12">
+          <StackPanel Orientation="Horizontal" Spacing="16">
+            <RadioButton Content="Movie" IsChecked="{Binding !NewIsSeries}" GroupName="kind" />
+            <RadioButton Content="Series" IsChecked="{Binding NewIsSeries}" GroupName="kind" />
+          </StackPanel>
+          <TextBox Text="{Binding NewTitle}" PlaceholderText="Title, e.g. Shogun" />
+          <TextBox Text="{Binding NewSource}" PlaceholderText="magnet:?xt=urn:btih:…" />
+          <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding NewIsSeries}">
+            <TextBox Width="150" Text="{Binding NewSeason}" PlaceholderText="Season (optional)" />
+            <TextBox Width="150" Text="{Binding NewEpisode}" PlaceholderText="Episode (optional)" />
+          </StackPanel>
+          <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap" IsVisible="{Binding NewIsSeries}"
+                     Text="Empty season = whole series. New downloads join the existing series." />
+          <Button Classes="accent" HorizontalAlignment="Left" Content="Download to Pi" Command="{Binding AddCommand}" />
+        </StackPanel>
+      </Border>
+
+      <TextBlock Classes="muted" IsVisible="{Binding IsEmpty}"
+                 Text="Nothing here yet. Find a movie or a series in Search and it will download to the Pi." />
+    </StackPanel>
+
+    <ScrollViewer>
+      <ItemsControl ItemsSource="{Binding Items}" Margin="0,0,0,24">
+        <ItemsControl.ItemsPanel>
+          <ItemsPanelTemplate>
+            <StackPanel Spacing="12" />
+          </ItemsPanelTemplate>
+        </ItemsControl.ItemsPanel>
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:LibraryItemViewModel">
+            <Border Classes="card">
+              <Grid ColumnDefinitions="Auto,*" ColumnSpacing="18">
+                <Border Width="56" Height="80" CornerRadius="6" Background="#2D4A6B" VerticalAlignment="Top">
+                  <TextBlock Text="{Binding Initials}" Foreground="White" FontWeight="SemiBold"
+                             HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+
+                <!-- Everything on the right shares one column, so all actions line up on its right edge. -->
+                <StackPanel Grid.Column="1" Spacing="12">
+                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                    <StackPanel Spacing="4" VerticalAlignment="Center">
+                      <TextBlock Text="{Binding Title}" FontSize="17" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                      <TextBlock Classes="muted" FontSize="13" Text="{Binding Subtitle}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                      <Button Classes="accent" Command="{Binding PlayCommand}" IsVisible="{Binding CanPlay}">
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                          <PathIcon Data="M8 5v14l11-7z" Width="12" Height="12" Foreground="White" />
+                          <TextBlock Text="{Binding PlayLabel}" VerticalAlignment="Center" />
+                        </StackPanel>
+                      </Button>
+                      <Button Classes="icon" Command="{Binding AskDeleteCommand}" ToolTip.Tip="Delete">
+                        <PathIcon Data="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" Width="15" Height="15" />
+                      </Button>
+                    </StackPanel>
+                  </Grid>
+
+                  <ItemsControl ItemsSource="{Binding Downloads}">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate>
+                        <StackPanel Spacing="10" />
+                      </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:DownloadViewModel">
+                        <StackPanel Spacing="10">
+                          <Border Classes="divider" />
+                          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                            <StackPanel Spacing="5" VerticalAlignment="Center">
+                              <StackPanel Orientation="Horizontal" Spacing="10">
+                                <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="13" />
+                                <TextBlock Classes="muted" FontSize="12" Text="{Binding StatusText}" VerticalAlignment="Center"
+                                           IsVisible="{Binding !IsError}" />
+                                <TextBlock Classes="error" FontSize="12" Text="{Binding StatusText}" VerticalAlignment="Center"
+                                           IsVisible="{Binding IsError}" />
+                              </StackPanel>
+                              <TextBlock Text="{Binding ReleaseTitle}" Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis"
+                                         IsVisible="{Binding ReleaseTitle, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                              <ProgressBar Minimum="0" Maximum="100"
+                                           Value="{Binding Percent}" IsVisible="{Binding IsActive}" Margin="0,2,0,0" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                              <Button Classes="icon" Command="{Binding PauseCommand}" IsVisible="{Binding IsRunning}" ToolTip.Tip="Pause download">
+                                <PathIcon Data="M6 5h4v14H6z M14 5h4v14h-4z" Width="13" Height="13" />
+                              </Button>
+                              <Button Classes="icon" Command="{Binding ResumeCommand}" IsVisible="{Binding IsPaused}" ToolTip.Tip="Resume download">
+                                <PathIcon Data="M8 5v14l11-7z" Width="13" Height="13" />
+                              </Button>
+                              <Button Classes="icon" Command="{Binding DeleteCommand}" ToolTip.Tip="Delete this download and its files">
+                                <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+                                          Width="12" Height="12" />
+                              </Button>
+                            </StackPanel>
+                          </Grid>
+                        </StackPanel>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+
+                  <Button Classes="link" Command="{Binding ToggleEpisodesCommand}"
+                          IsVisible="{Binding EpisodesSummary, Converter={x:Static ObjectConverters.IsNotNull}}">
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                      <TextBlock Text="{Binding EpisodesSummary}" FontSize="13" />
+                      <PathIcon Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" Width="12" Height="12" IsVisible="{Binding !IsExpanded}" />
+                      <PathIcon Data="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" Width="12" Height="12" IsVisible="{Binding IsExpanded}" />
+                    </StackPanel>
+                  </Button>
+
+                  <ItemsControl ItemsSource="{Binding Episodes}" IsVisible="{Binding IsExpanded}" Margin="-10,0">
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:EpisodeViewModel">
+                        <Border Classes="row">
+                          <Grid ColumnDefinitions="64,*,160,Auto" ColumnSpacing="14">
+                            <TextBlock Grid.Column="0" Text="{Binding Code}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            <TextBlock Grid.Column="1" Text="{Binding Name}" Classes="muted" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                            <StackPanel Grid.Column="2" Spacing="4" VerticalAlignment="Center">
+                              <ProgressBar Minimum="0" Maximum="100" Value="{Binding WatchedPercent}" />
+                              <TextBlock Classes="muted" FontSize="11" Text="{Binding Remaining}"
+                                         IsVisible="{Binding Remaining, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                              <TextBlock Classes="muted" FontSize="11" Text="Watched" IsVisible="{Binding IsWatched}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                              <Button Classes="mini" Command="{Binding PlayCommand}" ToolTip.Tip="Play">
+                                <PathIcon Data="M8 5v14l11-7z" Width="12" Height="12" />
+                              </Button>
+                              <Button Classes="mini" Command="{Binding PlayFromStartCommand}" ToolTip.Tip="Play from the start">
+                                <PathIcon Data="M6 6h2v12H6zm3.5 6 8.5 6V6z" Width="12" Height="12" />
+                              </Button>
+                            </StackPanel>
+                          </Grid>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+
+                  <Border IsVisible="{Binding IsConfirmingDelete}" Background="#FBEAE8" CornerRadius="8" Padding="14,10">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                      <TextBlock Foreground="#8A2A22" VerticalAlignment="Center" TextWrapping="Wrap">
+                        <Run Text="Delete" />
+                        <Run Text="{Binding Title}" FontWeight="SemiBold" />
+                        <Run Text="and all its files from the Pi? This cannot be undone." />
+                      </TextBlock>
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                        <Button Content="Cancel" Command="{Binding CancelDeleteCommand}" />
+                        <Button Classes="danger" Content="Delete" Command="{Binding ConfirmDeleteCommand}" />
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+                </StackPanel>
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+    </ScrollViewer>
+  </DockPanel>
+</UserControl>

@@ -8,5 +8,6 @@
         <ColorPaletteResources x:Key="Light" Accent="#18794E" />
       </FluentTheme.Palettes>
     </FluentTheme>
+    <StyleInclude Source="avares://MovieStart.Desktop/Styles/AppStyles.axaml" />
   </Application.Styles>
 </Application>
