@@ -2,6 +2,7 @@ using MovieStart.Desktop.Services;
 using MovieStart.Shared.Health;
 using MovieStart.Shared.Library;
 using MovieStart.Shared.Player;
+using MovieStart.Shared.Profile;
 using MovieStart.Shared.Search;
 
 namespace MovieStart.Desktop.Tests;
@@ -31,6 +32,10 @@ public sealed class FakeAgentClient : IAgentClient
     public List<ReleaseInfo> Releases { get; set; } = [];
 
     public string? ReleaseQuery { get; private set; }
+
+    public VoiceProfile Profile { get; set; } = VoiceProfile.Default;
+
+    public VoiceProfile? SavedProfile { get; private set; }
 
     public List<PlayerCommand> Commands { get; } = [];
 
@@ -95,6 +100,21 @@ public sealed class FakeAgentClient : IAgentClient
         ReleaseQuery = query;
         return Task.FromResult(new AgentResult<IReadOnlyList<ReleaseInfo>>(Result.IsSuccess ? Releases : null, Result.Error));
     }
+
+    public Task<AgentResult<VoiceProfile>> GetVoiceProfileAsync(string agentUrl, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new AgentResult<VoiceProfile>(Result.IsSuccess ? Profile : null, Result.Error));
+
+    public Task<AgentResult> SaveVoiceProfileAsync(string agentUrl, VoiceProfile profile, CancellationToken cancellationToken = default)
+    {
+        SavedProfile = profile;
+        return Record("save profile");
+    }
+
+    public Task<AgentResult> CompleteDemoDownloadsAsync(string agentUrl, CancellationToken cancellationToken = default) =>
+        Record("demo complete");
+
+    public Task<AgentResult> ResetDemoAsync(string agentUrl, CancellationToken cancellationToken = default) =>
+        Record("demo reset");
 
     private Task<AgentResult> Record(string call)
     {

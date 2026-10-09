@@ -108,7 +108,7 @@
     <!-- Remote control -->
     <Border DockPanel.Dock="Bottom" Background="White" BorderBrush="#E4E2DD" BorderThickness="0,1,0,0" Padding="24,14"
             DataContext="{Binding Player}" x:DataType="vm:PlayerViewModel">
-      <Grid ColumnDefinitions="2*,3*,2*" IsEnabled="{Binding IsConnected}">
+      <Grid ColumnDefinitions="200,*,Auto" ColumnSpacing="24" IsEnabled="{Binding IsConnected}">
         <StackPanel Grid.Column="0" Spacing="3" VerticalAlignment="Center">
           <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
           <TextBlock Classes="muted" FontSize="12" Text="On TV" IsVisible="{Binding HasMedia}" />
@@ -142,11 +142,11 @@
                     IsEnabled="{Binding HasMedia}">
           <StackPanel Spacing="4">
             <TextBlock Classes="muted" FontSize="11" Text="Audio" />
-            <ComboBox MinWidth="130" ItemsSource="{Binding AudioTracks}" SelectedItem="{Binding SelectedAudioTrack}" />
+            <ComboBox Width="150" ItemsSource="{Binding AudioTracks}" SelectedItem="{Binding SelectedAudioTrack}" />
           </StackPanel>
           <StackPanel Spacing="4">
             <TextBlock Classes="muted" FontSize="11" Text="Subtitles" />
-            <ComboBox MinWidth="100" ItemsSource="{Binding SubtitleTracks}" SelectedItem="{Binding SelectedSubtitleTrack}" />
+            <ComboBox Width="130" ItemsSource="{Binding SubtitleTracks}" SelectedItem="{Binding SelectedSubtitleTrack}" />
           </StackPanel>
           <StackPanel Spacing="4">
             <TextBlock Classes="muted" FontSize="11" Text="Volume" />
@@ -184,6 +184,14 @@
               </DockPanel>
             </Button>
             <Button Classes="nav" Classes.selected="{Binding IsSettingsSection}" Command="{Binding ShowSettingsCommand}" Content="Settings" />
+            <Button Classes="nav" Classes.selected="{Binding IsDemoSection}" Command="{Binding ShowDemoCommand}" IsVisible="{Binding IsDemo}">
+              <DockPanel>
+                <Border DockPanel.Dock="Right" Classes="tag" Background="#FCEFD9">
+                  <TextBlock Text="test" FontSize="11" Foreground="#9A5B00" />
+                </Border>
+                <TextBlock Text="Demo" />
+              </DockPanel>
+            </Button>
           </StackPanel>
         </StackPanel>
       </DockPanel>
@@ -452,7 +460,9 @@
                                       <TextBlock Classes="error" FontSize="12" Text="{Binding StatusText}" VerticalAlignment="Center"
                                                  IsVisible="{Binding IsError}" />
                                     </StackPanel>
-                                    <ProgressBar MaxWidth="360" HorizontalAlignment="Left" Width="360" Minimum="0" Maximum="100"
+                                    <TextBlock Text="{Binding ReleaseTitle}" Classes="muted" FontSize="11" TextTrimming="CharacterEllipsis"
+                                             IsVisible="{Binding ReleaseTitle, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                  <ProgressBar MaxWidth="360" HorizontalAlignment="Left" Width="360" Minimum="0" Maximum="100"
                                                  Value="{Binding Percent}" IsVisible="{Binding IsActive}" />
                                   </StackPanel>
                                   <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
@@ -537,17 +547,98 @@
       </Panel>
 
       <!-- Settings -->
-      <StackPanel IsVisible="{Binding IsSettingsSection}" Margin="32,28" Spacing="16" MaxWidth="620" HorizontalAlignment="Left">
-        <TextBlock Text="Settings" FontSize="26" FontWeight="SemiBold" />
-        <StackPanel Spacing="8">
-          <TextBlock Text="Agent address" FontWeight="SemiBold" />
-          <DockPanel>
-            <Button DockPanel.Dock="Right" Margin="8,0,0,0" Content="Check" Command="{Binding CheckConnectionCommand}" />
-            <TextBox Text="{Binding AgentUrl}" PlaceholderText="http://sheva-server.local:5080" />
-          </DockPanel>
-          <TextBlock Text="For local development run the agent on this Mac and use http://localhost:5080."
-                     Classes="muted" FontSize="12" TextWrapping="Wrap" />
+      <ScrollViewer IsVisible="{Binding IsSettingsSection}">
+        <StackPanel Margin="32,28" Spacing="24" MaxWidth="720" HorizontalAlignment="Left">
+          <TextBlock Text="Settings" FontSize="26" FontWeight="SemiBold" />
+
+          <StackPanel Spacing="8">
+            <TextBlock Text="Agent address" FontWeight="SemiBold" />
+            <DockPanel>
+              <Button DockPanel.Dock="Right" Margin="8,0,0,0" Content="Check" Command="{Binding CheckConnectionCommand}" />
+              <TextBox Text="{Binding AgentUrl}" PlaceholderText="http://sheva-server.local:5080" />
+            </DockPanel>
+            <TextBlock Text="For local development run the agent on this Mac and use http://localhost:5080."
+                       Classes="muted" FontSize="12" TextWrapping="Wrap" />
+          </StackPanel>
+
+          <Border Classes="card" DataContext="{Binding VoiceProfile}" x:DataType="vm:VoiceProfileViewModel">
+            <StackPanel Spacing="12">
+              <TextBlock Text="Voice-over profile" FontWeight="SemiBold" FontSize="16" />
+              <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap"
+                         Text="Best first. Releases with these voice-overs are listed first, and playback picks the matching audio track. Studio is optional, e.g. HDRezka or LostFilm." />
+
+              <ItemsControl ItemsSource="{Binding Preferences}">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:VoicePreferenceRowViewModel">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                      <ComboBox Width="130" ItemsSource="{Binding Languages}" SelectedItem="{Binding Language}" />
+                      <ComboBox Width="140" ItemsSource="{Binding Types}" SelectedItem="{Binding Type}" />
+                      <TextBox Width="160" Text="{Binding Studio}" PlaceholderText="Any studio" />
+                      <Button Classes="icon" Command="{Binding MoveUpCommand}" ToolTip.Tip="Move up">
+                        <PathIcon Data="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" Width="12" Height="12" />
+                      </Button>
+                      <Button Classes="icon" Command="{Binding MoveDownCommand}" ToolTip.Tip="Move down">
+                        <PathIcon Data="M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z" Width="12" Height="12" />
+                      </Button>
+                      <Button Classes="icon" Command="{Binding RemoveCommand}" ToolTip.Tip="Remove">
+                        <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" Width="12" Height="12" />
+                      </Button>
+                    </StackPanel>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+
+              <StackPanel Orientation="Horizontal" Spacing="8">
+                <Button Content="Add preference" Command="{Binding AddCommand}" />
+                <Button Content="Reset to default" Command="{Binding ResetToDefaultCommand}" />
+              </StackPanel>
+
+              <StackPanel Spacing="6">
+                <TextBlock Text="Subtitles when the audio is in another language" FontWeight="SemiBold" />
+                <ItemsControl ItemsSource="{Binding SubtitleLanguages}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="16" /></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:SubtitleLanguageViewModel">
+                      <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected}" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap"
+                           Text="With a dub, only forced subtitles (signs, foreign lines) in the dub's language are shown." />
+              </StackPanel>
+
+              <StackPanel Orientation="Horizontal" Spacing="12">
+                <Button Classes="accent" Content="Save profile" Command="{Binding SaveCommand}" />
+                <TextBlock Text="{Binding Status}" Foreground="#18794E" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding Error}" Classes="error" VerticalAlignment="Center" />
+              </StackPanel>
+            </StackPanel>
+          </Border>
         </StackPanel>
+      </ScrollViewer>
+
+      <!-- Demo -->
+      <StackPanel IsVisible="{Binding IsDemoSection}" Margin="32,28" Spacing="16" MaxWidth="720" HorizontalAlignment="Left">
+        <TextBlock Text="Demo" FontSize="26" FontWeight="SemiBold" />
+        <TextBlock TextWrapping="Wrap" Foreground="#45433F"
+                   Text="The agent runs in demo mode: movie search uses the real TMDB, while trackers, torrent downloads and the TV player are simulated. Finished downloads are short real video files with several audio and subtitle tracks, so track selection, the remote and deleting all work for real." />
+        <Border Classes="card">
+          <StackPanel Spacing="10">
+            <TextBlock Text="Try it" FontWeight="SemiBold" />
+            <TextBlock TextWrapping="Wrap" Classes="muted"
+                       Text="1. Search for a movie or series and download a release.&#10;2. Watch it download in the library (about 25 seconds), or finish all downloads now.&#10;3. Press Watch: the player starts with the audio track from your voice-over profile.&#10;4. Use the remote: pause, seek, volume, audio and subtitle tracks." />
+          </StackPanel>
+        </Border>
+        <StackPanel Orientation="Horizontal" Spacing="8">
+          <Button Classes="accent" Content="Finish all downloads" Command="{Binding CompleteDemoDownloadsCommand}" />
+          <Button Content="Reset demo library" Command="{Binding ResetDemoCommand}" />
+        </StackPanel>
+        <TextBlock Text="{Binding DemoStatus}" Classes="muted" TextWrapping="Wrap" />
       </StackPanel>
     </Panel>
   </DockPanel>

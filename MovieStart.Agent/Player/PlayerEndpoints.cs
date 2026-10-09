@@ -24,7 +24,7 @@ public static class PlayerEndpoints
         if (!File.Exists(fullPath))
             return Results.Problem("File not found.", statusCode: StatusCodes.Status404NotFound);
 
-        return await RunAsync(() => player.PlayAsync(fullPath, 0, cancellationToken));
+        return await RunAsync(() => player.PlayAsync(fullPath, new PlaybackOptions(), cancellationToken));
     }
 
     private static Task<IResult> SendCommandAsync(PlayerCommand command, IPlayer player, CancellationToken cancellationToken) =>

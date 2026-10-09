@@ -1,5 +1,7 @@
 using System.Text.RegularExpressions;
+using MovieStart.Agent.Profile;
 using MovieStart.Shared.Library;
+using MovieStart.Shared.Profile;
 using MovieStart.Shared.Search;
 
 namespace MovieStart.Agent.Search;
@@ -8,7 +10,7 @@ namespace MovieStart.Agent.Search;
 /// <param name="Query">What the user typed; searched too when it differs from the titles.</param>
 public sealed record ReleaseSearch(MediaKind Kind, string Title, string? OriginalTitle = null, int? Year = null, string? Query = null);
 
-public sealed partial class SearchService(ITmdbClient tmdb, IProwlarrClient prowlarr)
+public sealed partial class SearchService(ITmdbClient tmdb, IProwlarrClient prowlarr, IVoiceProfileStore profiles)
 {
     public const int TargetResolution = 1080;
 
@@ -29,6 +31,7 @@ public sealed partial class SearchService(ITmdbClient tmdb, IProwlarrClient prow
             throw new ArgumentException("Title is required.");
 
         var category = search.Kind == MediaKind.Movie ? MovieCategory : TvCategory;
+        var profile = profiles.Get();
         var results = await Task.WhenAll(BuildQueries(search).Select(query => prowlarr.SearchAsync(query, category, cancellationToken)));
 
         return results
@@ -38,7 +41,8 @@ public sealed partial class SearchService(ITmdbClient tmdb, IProwlarrClient prow
             .Select(ToReleaseInfo)
             .OfType<ReleaseInfo>()
             .Where(release => IsWanted(release, search))
-            .OrderByDescending(QualityScore)
+            .OrderByDescending(release => ProfileScore(profile, release))
+            .ThenByDescending(QualityScore)
             .ThenByDescending(release => release.Seeders)
             .ToList();
     }
@@ -61,6 +65,10 @@ public sealed partial class SearchService(ITmdbClient tmdb, IProwlarrClient prow
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
     }
+
+    /// <summary>Releases with the viewer's preferred voice-over come first; the better the preference, the higher.</summary>
+    internal static int ProfileScore(VoiceProfile profile, ReleaseInfo release) =>
+        VoiceMatcher.BestPreferenceIndex(profile, release.Audio) is { } index ? profile.Audio.Count - index : 0;
 
     /// <summary>Higher is better: source first, then container, codec and a sensible size.</summary>
     internal static int QualityScore(ReleaseInfo release)

@@ -16,10 +16,11 @@ public partial class DownloadViewModel(LibraryViewModel library, Guid itemId, Li
     {
         { Season: { } s, Episode: { } e } => $"S{s:00}E{e:00}",
         { Season: { } s } => $"Season {s}",
-        _ => Download.ReleaseTitle ?? "Download",
+        _ => "Release",
     };
 
-    public string? ReleaseTitle => Download.Season is null ? null : Download.ReleaseTitle;
+    /// <summary>Full release name; long, so the view trims it.</summary>
+    public string? ReleaseTitle => Download.ReleaseTitle;
 
     public bool IsActive => Download.Status is DownloadStatus.Queued or DownloadStatus.Downloading or DownloadStatus.Paused;
 

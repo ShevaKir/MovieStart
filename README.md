@@ -29,7 +29,7 @@ Mac (MovieStart.Desktop)                Raspberry Pi 5 (sheva-server.local)
 - 1080p only; CAMRip/TS releases are filtered out.
 - Release ranking: voice-over profile → source (BDRip > WEB-DL > WEBRip) → MKV → x265 10-bit → seeders.
 - Filters by audio language (UKR / RUS / ENG) and voice-over type (dub, multi-voice, single-voice author, original).
-- Preferred audio track is selected automatically on playback.
+- Voice-over profile (e.g. Ukrainian dub → Russian dub → English original): ranks releases and picks the audio track on playback; subtitles follow (forced ones with a dub, full ones with the original). Tracks are read with ffprobe.
 - Series: download a whole series, a season or single episodes; they are merged into one episode list.
 - Continue watching: the position of every file is remembered; "Continue" resumes the last episode or moves to the next one.
 - Pi disk usage, deletion of whole items or single downloads, free-space check before a download starts.
@@ -60,6 +60,16 @@ dotnet run --project MovieStart.Agent     # http://localhost:5080
 dotnet run --project MovieStart.Desktop
 dotnet test --solution MovieStart.slnx
 ```
+
+### Demo mode
+
+Try the whole app on a Mac without the Pi, Prowlarr, qBittorrent or mpv:
+
+```bash
+./scripts/demo.sh
+```
+
+Search uses the real TMDB (put `Tmdb:ReadAccessToken` into `MovieStart.Agent/appsettings.Local.json`); releases, downloads and the TV player are simulated. A finished download is a short real video (made by ffmpeg) with several audio and subtitle tracks, so track selection and the remote can be tested. The app shows a **Demo** menu to finish downloads instantly or reset the demo library. Data lives in `/tmp/moviestart-demo`.
 
 Local overrides go into `appsettings.Local.json` (gitignored). Port 5000 is avoided because macOS AirPlay Receiver uses it.
 

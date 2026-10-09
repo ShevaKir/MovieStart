@@ -19,6 +19,7 @@ public sealed class LibraryWatcher(LibraryService library, ILogger<LibraryWatche
             {
                 await library.SyncAsync(stoppingToken);
                 reportedUnavailable = false;
+                await library.ProbeNewFilesAsync(stoppingToken);
             }
             catch (QbitUnavailableException ex)
             {

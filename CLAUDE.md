@@ -18,6 +18,7 @@ MovieStart — a Mac app (Avalonia, .NET 10) plus an agent on a Raspberry Pi 5 (
 - The player sits behind an `IPlayer` interface (mpv now, Kodi possible later).
 - DTOs and API contracts live only in `MovieStart.Shared`.
 - Config: committed `appsettings.json`; personal local overrides in `appsettings.Local.json` (gitignored, template in `appsettings.Local.example.json`); env vars win on deploy (Desktop uses the `MOVIESTART_` prefix).
+- Demo mode (`Demo:Enabled`, launch profile `demo`, `scripts/demo.sh`) swaps Prowlarr, qBittorrent and mpv for simulations in `MovieStart.Agent/Demo`; TMDB and ffprobe stay real. Keep it working when those interfaces change.
 - Every project has its own test project under `tests/` (xUnit v3 on Microsoft.Testing.Platform). Run `dotnet test --solution MovieStart.slnx`.
 
 ## UI

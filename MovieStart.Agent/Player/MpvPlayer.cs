@@ -35,19 +35,28 @@ public sealed partial class MpvPlayer(IOptions<PlayerOptions> options, ILogger<M
         }
     }
 
-    public async Task PlayAsync(string path, double startSeconds, CancellationToken cancellationToken)
+    public async Task PlayAsync(string path, PlaybackOptions options, CancellationToken cancellationToken)
     {
-        await SendMpvAsync(ToLoadCommand(path, startSeconds, _loadfileHasIndex), cancellationToken);
+        await SendMpvAsync(ToLoadCommand(path, options, _loadfileHasIndex), cancellationToken);
         await SendMpvAsync(["set_property", "pause", false], cancellationToken);
     }
 
-    internal static object?[] ToLoadCommand(string path, double startSeconds, bool loadfileHasIndex)
+    /// <summary>Per-file options (start, aid, sid) apply to this file only, unlike setting the properties.</summary>
+    internal static object?[] ToLoadCommand(string path, PlaybackOptions options, bool loadfileHasIndex)
     {
-        if (startSeconds <= 0)
+        var fileOptions = new List<string>();
+        if (options.StartSeconds > 0)
+            fileOptions.Add($"start={options.StartSeconds.ToString("0.###", CultureInfo.InvariantCulture)}");
+        if (options.AudioTrackId is { } aid)
+            fileOptions.Add($"aid={aid}");
+        if (options.Subtitles is { } subtitles)
+            fileOptions.Add(subtitles.TrackId is { } sid ? $"sid={sid}" : "sid=no");
+
+        if (fileOptions.Count == 0)
             return ["loadfile", path, "replace"];
 
-        var start = $"start={startSeconds.ToString("0.###", CultureInfo.InvariantCulture)}";
-        return loadfileHasIndex ? ["loadfile", path, "replace", -1, start] : ["loadfile", path, "replace", start];
+        var joined = string.Join(',', fileOptions);
+        return loadfileHasIndex ? ["loadfile", path, "replace", -1, joined] : ["loadfile", path, "replace", joined];
     }
 
     /// <summary>True for mpv 0.38 and later, and when the version is unknown.</summary>

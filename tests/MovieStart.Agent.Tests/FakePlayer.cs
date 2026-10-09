@@ -9,18 +9,20 @@ public sealed class FakePlayer : IPlayer
 
     public string? PlayedPath { get; private set; }
 
-    public double? PlayedStart { get; private set; }
+    public PlaybackOptions? PlayedOptions { get; private set; }
+
+    public double? PlayedStart => PlayedOptions?.StartSeconds;
 
     public PlayerCommand? LastCommand { get; private set; }
 
     public Exception? Failure { get; set; }
 
-    public Task PlayAsync(string path, double startSeconds, CancellationToken cancellationToken)
+    public Task PlayAsync(string path, PlaybackOptions options, CancellationToken cancellationToken)
     {
         if (Failure is not null)
             throw Failure;
         PlayedPath = path;
-        PlayedStart = startSeconds;
+        PlayedOptions = options;
         return Task.CompletedTask;
     }
 

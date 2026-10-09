@@ -14,6 +14,14 @@ public static class ApiRoutes
     public const string SearchTitles = "/api/search/titles";
     public const string SearchReleases = "/api/search/releases";
 
+    public const string VoiceProfile = "/api/profile/voice";
+
+    /// <summary>Only in demo mode: finish every simulated download now.</summary>
+    public const string DemoCompleteDownloads = "/api/demo/complete-downloads";
+
+    /// <summary>Only in demo mode: delete the demo library and start over.</summary>
+    public const string DemoReset = "/api/demo/reset";
+
     public static string LibraryItem(Guid id) => $"{Library}/{id}";
 
     public static string LibraryPlay(Guid id) => $"{Library}/{id}/play";
