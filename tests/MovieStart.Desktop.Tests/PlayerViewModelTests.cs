@@ -155,18 +155,6 @@ public class PlayerViewModelTests
     }
 
     [Fact]
-    public async Task PlayFileSendsTrimmedPathAndShowsErrors()
-    {
-        _agent.Result = AgentResult.Failure("File not found.");
-        _player.FilePath = "  /mnt/movies/Dune.mkv ";
-
-        await _player.PlayFileCommand.ExecuteAsync(null);
-
-        Assert.Equal("/mnt/movies/Dune.mkv", _agent.PlayedPath);
-        Assert.Equal("File not found.", _player.Error);
-    }
-
-    [Fact]
     public async Task SuccessfulCommandClearsError()
     {
         _agent.Result = AgentResult.Failure("The player is not running.");

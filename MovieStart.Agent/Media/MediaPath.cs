@@ -1,4 +1,4 @@
-namespace MovieStart.Agent.Player;
+namespace MovieStart.Agent.Media;
 
 public static class MediaPath
 {

@@ -7,6 +7,7 @@ public partial class MainWindow : Window
 {
     private static readonly TimeSpan HealthInterval = TimeSpan.FromSeconds(5);
     private static readonly TimeSpan PlayerInterval = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan LibraryInterval = TimeSpan.FromSeconds(2);
 
     private readonly CancellationTokenSource _polling = new();
 
@@ -22,6 +23,7 @@ public partial class MainWindow : Window
         {
             _ = PollAsync(token => viewModel.RunPollingAsync(HealthInterval, token));
             _ = PollAsync(token => viewModel.Player.RunPollingAsync(PlayerInterval, token));
+            _ = PollAsync(token => viewModel.Library.RunPollingAsync(LibraryInterval, token));
         }
     }
 

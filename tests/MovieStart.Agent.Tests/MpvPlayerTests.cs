@@ -31,9 +31,9 @@ public sealed class MpvPlayerTests : IAsyncLifetime
     [Fact]
     public async Task PlayLoadsFileAndUnpauses()
     {
-        await _player.PlayAsync("/mnt/movies/Dune.mkv", TestContext.Current.CancellationToken);
+        await _player.PlayAsync("/mnt/movies/Dune.mkv", 0, TestContext.Current.CancellationToken);
 
-        var commands = _mpv.Commands.Where(c => Name(c) != "observe_property").Select(Render).ToList();
+        var commands = _mpv.Commands.Where(c => Name(c) is not ("observe_property" or "get_property")).Select(Render).ToList();
         Assert.Equal(["loadfile /mnt/movies/Dune.mkv replace", "set_property pause False"], commands);
     }
 
@@ -101,6 +101,49 @@ public sealed class MpvPlayerTests : IAsyncLifetime
         await Assert.ThrowsAsync<PlayerUnavailableException>(
             () => _player.SendAsync(PlayerCommand.Stop(), TestContext.Current.CancellationToken));
         await Eventually.AssertAsync(() => _player.State.IsConnected, "the player reconnects", timeoutMs: 5000);
+    }
+
+    [Fact]
+    public async Task PlayFromPositionPassesStartOption()
+    {
+        await _player.PlayAsync("/mnt/movies/Show/S01E02.mkv", 754.5, TestContext.Current.CancellationToken);
+
+        var load = _mpv.Commands.Single(c => Name(c) == "loadfile");
+        Assert.Equal("loadfile /mnt/movies/Show/S01E02.mkv replace -1 start=754.5", Render(load));
+    }
+
+    [Theory]
+    [InlineData(0, true, "loadfile /a.mkv replace")]
+    [InlineData(90, true, "loadfile /a.mkv replace -1 start=90")]
+    [InlineData(90, false, "loadfile /a.mkv replace start=90")]
+    public void BuildsLoadCommandForMpvVersion(double start, bool hasIndex, string expected)
+    {
+        Assert.Equal(expected, string.Join(' ', MpvPlayer.ToLoadCommand("/a.mkv", start, hasIndex)));
+    }
+
+    [Theory]
+    [InlineData("mpv 0.35.1", false)]
+    [InlineData("mpv v0.38.0-dirty", true)]
+    [InlineData("mpv 0.40.0", true)]
+    [InlineData(null, true)]
+    public void DetectsLoadfileIndexArgument(string? version, bool expected)
+    {
+        Assert.Equal(expected, MpvPlayer.LoadfileHasIndex(version));
+    }
+
+    [Fact]
+    public async Task InvalidSocketPathDoesNotStopTheAgent()
+    {
+        using var player = new MpvPlayer(
+            Options.Create(new PlayerOptions { SocketPath = "/" + new string('x', 200) }),
+            NullLogger<MpvPlayer>.Instance);
+
+        await player.StartAsync(TestContext.Current.CancellationToken);
+        await Task.Delay(200, TestContext.Current.CancellationToken);
+
+        Assert.False(player.ExecuteTask!.IsFaulted);
+        Assert.False(player.State.IsConnected);
+        await player.StopAsync(CancellationToken.None);
     }
 
     [Theory]

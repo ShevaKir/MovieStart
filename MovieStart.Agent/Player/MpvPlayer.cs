@@ -1,5 +1,7 @@
+using System.Globalization;
 using System.Net.Sockets;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.Options;
 using MovieStart.Shared.Player;
 
@@ -9,7 +11,7 @@ namespace MovieStart.Agent.Player;
 /// Controls an mpv instance started separately (systemd on the Pi) with <c>--idle --input-ipc-server</c>.
 /// Keeps reconnecting while the agent runs and mirrors mpv properties into <see cref="State"/>.
 /// </summary>
-public sealed class MpvPlayer(IOptions<PlayerOptions> options, ILogger<MpvPlayer> logger) : BackgroundService, IPlayer
+public sealed partial class MpvPlayer(IOptions<PlayerOptions> options, ILogger<MpvPlayer> logger) : BackgroundService, IPlayer
 {
     private static readonly string[] ObservedProperties =
         ["idle-active", "path", "media-title", "pause", "time-pos", "duration", "volume", "aid", "sid", "track-list"];
@@ -21,6 +23,9 @@ public sealed class MpvPlayer(IOptions<PlayerOptions> options, ILogger<MpvPlayer
     private PlayerState _state = PlayerState.Disconnected;
     private volatile MpvIpcClient? _client;
 
+    // mpv 0.38 added an "index" argument to loadfile before the per-file options.
+    private volatile bool _loadfileHasIndex = true;
+
     public PlayerState State
     {
         get
@@ -30,11 +35,33 @@ public sealed class MpvPlayer(IOptions<PlayerOptions> options, ILogger<MpvPlayer
         }
     }
 
-    public async Task PlayAsync(string path, CancellationToken cancellationToken)
+    public async Task PlayAsync(string path, double startSeconds, CancellationToken cancellationToken)
     {
-        await SendMpvAsync(["loadfile", path, "replace"], cancellationToken);
+        await SendMpvAsync(ToLoadCommand(path, startSeconds, _loadfileHasIndex), cancellationToken);
         await SendMpvAsync(["set_property", "pause", false], cancellationToken);
     }
+
+    internal static object?[] ToLoadCommand(string path, double startSeconds, bool loadfileHasIndex)
+    {
+        if (startSeconds <= 0)
+            return ["loadfile", path, "replace"];
+
+        var start = $"start={startSeconds.ToString("0.###", CultureInfo.InvariantCulture)}";
+        return loadfileHasIndex ? ["loadfile", path, "replace", -1, start] : ["loadfile", path, "replace", start];
+    }
+
+    /// <summary>True for mpv 0.38 and later, and when the version is unknown.</summary>
+    internal static bool LoadfileHasIndex(string? mpvVersion)
+    {
+        if (mpvVersion is null || VersionNumber().Match(mpvVersion) is not { Success: true } match)
+            return true;
+        var major = int.Parse(match.Groups["major"].Value);
+        var minor = int.Parse(match.Groups["minor"].Value);
+        return major > 0 || minor >= 38;
+    }
+
+    [GeneratedRegex(@"(?<major>\d+)\.(?<minor>\d+)")]
+    private static partial Regex VersionNumber();
 
     public Task SendAsync(PlayerCommand command, CancellationToken cancellationToken) =>
         SendMpvAsync(ToMpvCommand(command), cancellationToken);
@@ -65,6 +92,9 @@ public sealed class MpvPlayer(IOptions<PlayerOptions> options, ILogger<MpvPlayer
                 client.EventReceived += OnEvent;
                 SetState(PlayerState.Disconnected with { IsConnected = true });
 
+                var version = await client.SendAsync(["get_property", "mpv-version"], stoppingToken);
+                _loadfileHasIndex = LoadfileHasIndex(version.ValueKind == JsonValueKind.String ? version.GetString() : null);
+
                 for (var i = 0; i < ObservedProperties.Length; i++)
                     await client.SendAsync(["observe_property", i + 1, ObservedProperties[i]], stoppingToken);
 
@@ -79,7 +109,8 @@ public sealed class MpvPlayer(IOptions<PlayerOptions> options, ILogger<MpvPlayer
             {
                 break;
             }
-            catch (Exception ex) when (ex is SocketException or IOException or PlayerCommandException)
+            // ArgumentException: the socket path is invalid, e.g. longer than the platform allows.
+            catch (Exception ex) when (ex is SocketException or IOException or PlayerCommandException or ArgumentException)
             {
                 if (!reportedUnavailable)
                     logger.LogWarning("mpv is not available at {SocketPath}: {Reason}", options.Value.SocketPath, ex.Message);

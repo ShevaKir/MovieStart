@@ -46,7 +46,7 @@ public partial class PlayerViewModel : ObservableObject
     private double _position;
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(DurationText))]
+    [NotifyPropertyChangedFor(nameof(DurationText), nameof(SeekMaximum))]
     private double _duration;
 
     [ObservableProperty]
@@ -65,9 +65,6 @@ public partial class PlayerViewModel : ObservableObject
     private TrackOption? _selectedSubtitleTrack = TrackOption.Off;
 
     [ObservableProperty]
-    private string _filePath = string.Empty;
-
-    [ObservableProperty]
     private string? _error;
 
     public PlayerViewModel(IAgentClient agentClient, Func<string> agentUrl, TimeSpan? debounce = null)
@@ -82,6 +79,9 @@ public partial class PlayerViewModel : ObservableObject
     public string PositionText => FormatTime(Position);
 
     public string DurationText => FormatTime(Duration);
+
+    /// <summary>Slider maximum; never 0, otherwise the thumb jumps to the end when nothing is playing.</summary>
+    public double SeekMaximum => Math.Max(1, Duration);
 
     /// <summary>Completes when the last command sent to the agent has finished. Used by tests.</summary>
     internal Task WhenSentAsync() => _lastSend;
@@ -146,13 +146,6 @@ public partial class PlayerViewModel : ObservableObject
 
     [RelayCommand]
     private Task StopAsync() => SendAsync(PlayerCommand.Stop());
-
-    [RelayCommand]
-    private async Task PlayFileAsync()
-    {
-        var result = await _agentClient.PlayAsync(_agentUrl(), FilePath.Trim());
-        Error = result.Error;
-    }
 
     partial void OnPositionChanged(double value)
     {

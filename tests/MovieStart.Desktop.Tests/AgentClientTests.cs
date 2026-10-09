@@ -2,6 +2,7 @@ using System.Net;
 using System.Net.Http.Json;
 using MovieStart.Desktop.Services;
 using MovieStart.Shared.Health;
+using MovieStart.Shared.Library;
 using MovieStart.Shared.Player;
 
 namespace MovieStart.Desktop.Tests;
@@ -89,7 +90,7 @@ public class AgentClientTests
             Content = new StringContent("""{"status":503,"detail":"The player is not running."}"""),
         });
 
-        var result = await client.PlayAsync("http://pi.local:5080", "/mnt/movies/Dune.mkv", TestContext.Current.CancellationToken);
+        var result = await client.PlayItemAsync("http://pi.local:5080", Guid.NewGuid(), new PlayItemRequest(), TestContext.Current.CancellationToken);
 
         Assert.False(result.IsSuccess);
         Assert.Equal("The player is not running.", result.Error);
@@ -103,6 +104,46 @@ public class AgentClientTests
         var result = await client.SendPlayerCommandAsync("http://pi.local:5080", PlayerCommand.Stop(), TestContext.Current.CancellationToken);
 
         Assert.Equal("The agent is not reachable.", result.Error);
+    }
+
+    [Fact]
+    public async Task PlayItemReturnsStartedFile()
+    {
+        var itemId = Guid.NewGuid();
+        string? path = null;
+        var client = CreateClient(request =>
+        {
+            path = request.RequestUri!.AbsolutePath;
+            return new HttpResponseMessage(HttpStatusCode.OK)
+            {
+                Content = JsonContent.Create(new MediaFile(3, Guid.Empty, "S01E03.mkv", 1, 1, 3)),
+            };
+        });
+
+        var result = await client.PlayItemAsync("http://pi.local:5080", itemId, new PlayItemRequest(), TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("S01E03", result.Value?.EpisodeCode);
+        Assert.Equal($"/api/library/{itemId}/play", path);
+    }
+
+    [Fact]
+    public async Task DeletesDownloadWithDeleteVerb()
+    {
+        HttpRequestMessage? sent = null;
+        var client = CreateClient(request =>
+        {
+            sent = request;
+            return new HttpResponseMessage(HttpStatusCode.NoContent);
+        });
+        var itemId = Guid.NewGuid();
+        var downloadId = Guid.NewGuid();
+
+        var result = await client.DeleteDownloadAsync("http://pi.local:5080", itemId, downloadId, TestContext.Current.CancellationToken);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal(HttpMethod.Delete, sent?.Method);
+        Assert.Equal($"/api/library/{itemId}/downloads/{downloadId}", sent?.RequestUri?.AbsolutePath);
     }
 
     private static AgentClient CreateClient(Func<HttpRequestMessage, HttpResponseMessage> respond) =>

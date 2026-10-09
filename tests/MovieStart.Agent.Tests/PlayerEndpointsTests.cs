@@ -1,8 +1,5 @@
 using System.Net;
 using System.Net.Http.Json;
-using Microsoft.AspNetCore.Hosting;
-using Microsoft.AspNetCore.Mvc.Testing;
-using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
 using MovieStart.Agent.Player;
 using MovieStart.Shared;
@@ -12,25 +9,17 @@ namespace MovieStart.Agent.Tests;
 
 public sealed class PlayerEndpointsTests : IDisposable
 {
-    private readonly string _mediaRoot = Directory.CreateTempSubdirectory("movies-").FullName;
     private readonly FakePlayer _player = new();
-    private readonly WebApplicationFactory<Program> _factory;
+    private readonly AgentFactory _factory;
 
     public PlayerEndpointsTests()
     {
-        _factory = new WebApplicationFactory<Program>().WithWebHostBuilder(builder =>
-        {
-            builder.UseSetting("Player:MediaRoot", _mediaRoot);
-            builder.UseSetting("Player:SocketPath", Path.Combine(_mediaRoot, "none.sock"));
-            builder.ConfigureTestServices(services => services.AddSingleton<IPlayer>(_player));
-        });
+        _factory = new AgentFactory(services => services.AddSingleton<IPlayer>(_player));
     }
 
-    public void Dispose()
-    {
-        _factory.Dispose();
-        Directory.Delete(_mediaRoot, recursive: true);
-    }
+    private string MediaRoot => _factory.MediaRoot;
+
+    public void Dispose() => _factory.Dispose();
 
     [Fact]
     public async Task ReturnsPlayerState()
@@ -50,7 +39,7 @@ public sealed class PlayerEndpointsTests : IDisposable
     [Fact]
     public async Task PlaysFileInsideMediaRoot()
     {
-        var file = Path.Combine(_mediaRoot, "Dune.mkv");
+        var file = Path.Combine(MediaRoot, "Dune.mkv");
         await File.WriteAllTextAsync(file, "", TestContext.Current.CancellationToken);
         using var client = _factory.CreateClient();
 
@@ -77,7 +66,7 @@ public sealed class PlayerEndpointsTests : IDisposable
         using var client = _factory.CreateClient();
 
         var response = await client.PostAsJsonAsync(
-            ApiRoutes.PlayerPlay, new PlayRequest(Path.Combine(_mediaRoot, "missing.mkv")), TestContext.Current.CancellationToken);
+            ApiRoutes.PlayerPlay, new PlayRequest(Path.Combine(MediaRoot, "missing.mkv")), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
@@ -118,32 +107,5 @@ public sealed class PlayerEndpointsTests : IDisposable
         var response = await client.PostAsJsonAsync(ApiRoutes.PlayerCommand, PlayerCommand.SeekRelative(30), TestContext.Current.CancellationToken);
 
         Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
-    }
-
-    private sealed class FakePlayer : IPlayer
-    {
-        public PlayerState State { get; set; } = PlayerState.Disconnected;
-
-        public string? PlayedPath { get; private set; }
-
-        public PlayerCommand? LastCommand { get; private set; }
-
-        public Exception? Failure { get; set; }
-
-        public Task PlayAsync(string path, CancellationToken cancellationToken)
-        {
-            if (Failure is not null)
-                throw Failure;
-            PlayedPath = path;
-            return Task.CompletedTask;
-        }
-
-        public Task SendAsync(PlayerCommand command, CancellationToken cancellationToken)
-        {
-            if (Failure is not null)
-                throw Failure;
-            LastCommand = command;
-            return Task.CompletedTask;
-        }
     }
 }

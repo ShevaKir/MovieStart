@@ -24,9 +24,26 @@ public partial class MainWindowViewModel : ObservableObject
         _agentClient = agentClient;
         _agentUrl = agentUrl;
         Player = new PlayerViewModel(agentClient, () => AgentUrl);
+        Library = new LibraryViewModel(agentClient, () => AgentUrl);
     }
 
     public PlayerViewModel Player { get; }
+
+    public LibraryViewModel Library { get; }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsLibrarySection), nameof(IsSettingsSection))]
+    private Section _currentSection = Section.Library;
+
+    public bool IsLibrarySection => CurrentSection == Section.Library;
+
+    public bool IsSettingsSection => CurrentSection == Section.Settings;
+
+    [RelayCommand]
+    private void ShowLibrary() => CurrentSection = Section.Library;
+
+    [RelayCommand]
+    private void ShowSettings() => CurrentSection = Section.Settings;
 
     public bool IsOnline => Status == ConnectionStatus.Online;
 
@@ -56,4 +73,10 @@ public partial class MainWindowViewModel : ObservableObject
         }
         while (await timer.WaitForNextTickAsync(cancellationToken));
     }
+}
+
+public enum Section
+{
+    Library,
+    Settings,
 }

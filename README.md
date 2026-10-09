@@ -2,7 +2,7 @@
 
 A Mac desktop app that finds movies, downloads them to a Raspberry Pi 5, and plays them on a TV connected to the Pi over HDMI.
 
-> Status: early stage — agent health check and mpv player control are in place; downloads and search are next.
+> Status: early stage — player control and the download library are in place; search is next.
 
 ## How it works
 
@@ -29,7 +29,10 @@ Mac (MovieStart.Desktop)                Raspberry Pi 5 (sheva-server.local)
 - Release ranking: voice-over profile → source (BDRip > WEB-DL > WEBRip) → MKV → x265 10-bit → seeders.
 - Filters by audio language (UKR / RUS / ENG) and voice-over type (dub, multi-voice, single-voice author, original).
 - Preferred audio track is selected automatically on playback.
-- Pi disk usage, movie deletion, free-space check before a download starts.
+- Series: download a whole series, a season or single episodes; they are merged into one episode list.
+- Continue watching: the position of every file is remembered; "Continue" resumes the last episode or moves to the next one.
+- Pi disk usage, deletion of whole items or single downloads, free-space check before a download starts.
+- No database: each item keeps its metadata in `item.json` next to its files on the movies disk.
 
 ## Structure
 

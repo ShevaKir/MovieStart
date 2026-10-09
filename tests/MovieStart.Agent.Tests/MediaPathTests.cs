@@ -1,4 +1,4 @@
-using MovieStart.Agent.Player;
+using MovieStart.Agent.Media;
 
 namespace MovieStart.Agent.Tests;
 

@@ -4,10 +4,16 @@
         x:Class="MovieStart.Desktop.Views.MainWindow"
         x:DataType="vm:MainWindowViewModel"
         Title="MovieStart"
-        Width="1100" Height="720" MinWidth="720" MinHeight="480"
+        Width="1200" Height="800" MinWidth="820" MinHeight="560"
         Background="#F6F5F2">
 
   <Window.Styles>
+    <Style Selector="TextBlock.muted">
+      <Setter Property="Foreground" Value="#6E6A63" />
+    </Style>
+    <Style Selector="TextBlock.error">
+      <Setter Property="Foreground" Value="#C0392B" />
+    </Style>
     <Style Selector="Ellipse.status">
       <Setter Property="Fill" Value="#6E6A63" />
     </Style>
@@ -17,11 +23,33 @@
     <Style Selector="Ellipse.status.offline">
       <Setter Property="Fill" Value="#C0392B" />
     </Style>
-    <Style Selector="TextBlock.muted">
+    <Style Selector="Button.nav">
+      <Setter Property="HorizontalAlignment" Value="Stretch" />
+      <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="MinHeight" Value="40" />
+      <Setter Property="Padding" Value="10,0" />
+      <Setter Property="Background" Value="Transparent" />
       <Setter Property="Foreground" Value="#6E6A63" />
     </Style>
-    <Style Selector="TextBlock.error">
-      <Setter Property="Foreground" Value="#C0392B" />
+    <Style Selector="Button.nav:disabled /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.nav.selected">
+      <Setter Property="Background" Value="#EEEDE9" />
+      <Setter Property="Foreground" Value="#1C1B19" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.icon">
+      <Setter Property="Width" Value="36" />
+      <Setter Property="Height" Value="36" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="#D6D3CC" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
     <Style Selector="Button.remote">
       <Setter Property="Background" Value="Transparent" />
@@ -39,23 +67,22 @@
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
+    <Style Selector="Border.card">
+      <Setter Property="Background" Value="White" />
+      <Setter Property="BorderBrush" Value="#E4E2DD" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="12" />
+      <Setter Property="Padding" Value="14" />
+    </Style>
+    <Style Selector="ProgressBar">
+      <Setter Property="MinHeight" Value="6" />
+      <Setter Property="Height" Value="6" />
+      <Setter Property="CornerRadius" Value="3" />
+      <Setter Property="Background" Value="#E4E2DD" />
+    </Style>
   </Window.Styles>
 
   <DockPanel>
-    <!-- Header -->
-    <Border DockPanel.Dock="Top" Background="White" BorderBrush="#E4E2DD" BorderThickness="0,0,0,1" Padding="24,16">
-      <DockPanel>
-        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-          <Ellipse Width="8" Height="8"
-                   Classes="status"
-                   Classes.online="{Binding IsOnline}"
-                   Classes.offline="{Binding IsOffline}" />
-          <TextBlock Text="{Binding StatusText}" Classes="muted" />
-        </StackPanel>
-        <TextBlock Text="MovieStart" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
-      </DockPanel>
-    </Border>
-
     <!-- Remote control -->
     <Border DockPanel.Dock="Bottom" Background="White" BorderBrush="#E4E2DD" BorderThickness="0,1,0,0" Padding="24,14"
             DataContext="{Binding Player}" x:DataType="vm:PlayerViewModel">
@@ -64,6 +91,8 @@
           <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
           <TextBlock Classes="muted" FontSize="12" Text="On TV" IsVisible="{Binding HasMedia}" />
           <TextBlock Classes="muted" FontSize="12" Text="Player is not running" IsVisible="{Binding !IsConnected}" />
+          <TextBlock Classes="error" FontSize="12" Text="{Binding Error}" TextWrapping="Wrap"
+                     IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
         </StackPanel>
 
         <StackPanel Grid.Column="1" Spacing="6" IsEnabled="{Binding HasMedia}">
@@ -83,7 +112,7 @@
           <DockPanel>
             <TextBlock DockPanel.Dock="Left" Classes="muted" FontSize="12" Text="{Binding PositionText}" VerticalAlignment="Center" Margin="0,0,10,0" />
             <TextBlock DockPanel.Dock="Right" Classes="muted" FontSize="12" Text="{Binding DurationText}" VerticalAlignment="Center" Margin="10,0,0,0" />
-            <Slider Minimum="0" Maximum="{Binding Duration}" Value="{Binding Position}" />
+            <Slider Minimum="0" Maximum="{Binding SeekMaximum}" Value="{Binding Position}" />
           </DockPanel>
         </StackPanel>
 
@@ -105,30 +134,210 @@
       </Grid>
     </Border>
 
-    <!-- Content -->
-    <StackPanel Margin="24" Spacing="28" MaxWidth="620" HorizontalAlignment="Left">
-      <StackPanel Spacing="8">
-        <TextBlock Text="Agent address" FontWeight="SemiBold" />
-        <DockPanel>
-          <Button DockPanel.Dock="Right" Margin="8,0,0,0"
-                  Content="Check" Command="{Binding CheckConnectionCommand}" />
-          <TextBox Text="{Binding AgentUrl}" PlaceholderText="http://sheva-server.local:5080" />
-        </DockPanel>
-        <TextBlock Text="For local development run the agent on this Mac and use http://localhost:5080."
-                   Classes="muted" FontSize="12" TextWrapping="Wrap" />
-      </StackPanel>
+    <!-- Sidebar -->
+    <Border DockPanel.Dock="Left" Width="232" Background="White" BorderBrush="#E4E2DD" BorderThickness="0,0,1,0" Padding="14,20">
+      <DockPanel>
+        <StackPanel DockPanel.Dock="Bottom" Spacing="14" Margin="8,0">
+          <StackPanel Spacing="8" DataContext="{Binding Library}" x:DataType="vm:LibraryViewModel">
+            <TextBlock Classes="muted" FontSize="12" Text="{Binding StorageText}" />
+            <ProgressBar Minimum="0" Maximum="100" Value="{Binding StorageUsedPercent}" />
+          </StackPanel>
+          <StackPanel Orientation="Horizontal" Spacing="8">
+            <Ellipse Width="8" Height="8" VerticalAlignment="Center"
+                     Classes="status"
+                     Classes.online="{Binding IsOnline}"
+                     Classes.offline="{Binding IsOffline}" />
+            <TextBlock Classes="muted" FontSize="12" Text="{Binding StatusText}" TextTrimming="CharacterEllipsis" />
+          </StackPanel>
+        </StackPanel>
 
-      <!-- Temporary until the library exists: play any file from the agent's media root. -->
-      <StackPanel Spacing="8" DataContext="{Binding Player}" x:DataType="vm:PlayerViewModel">
-        <TextBlock Text="Play a file on the TV" FontWeight="SemiBold" />
-        <DockPanel>
-          <Button DockPanel.Dock="Right" Margin="8,0,0,0"
-                  Content="Play" Command="{Binding PlayFileCommand}" IsEnabled="{Binding IsConnected}" />
-          <TextBox Text="{Binding FilePath}" PlaceholderText="/mnt/movies/Dune (2021)/Dune.mkv" />
+        <StackPanel Spacing="24">
+          <TextBlock Text="MovieStart" FontSize="17" FontWeight="SemiBold" Margin="8,0" />
+          <StackPanel Spacing="2">
+            <Button Classes="nav" IsEnabled="False" ToolTip.Tip="Coming next">
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Right" Text="soon" FontSize="11" Classes="muted" VerticalAlignment="Center" />
+                <TextBlock Text="Search" />
+              </DockPanel>
+            </Button>
+            <Button Classes="nav" Classes.selected="{Binding IsLibrarySection}" Command="{Binding ShowLibraryCommand}">
+              <DockPanel>
+                <TextBlock DockPanel.Dock="Right" Text="{Binding Library.Items.Count}" FontSize="12" Classes="muted" VerticalAlignment="Center" />
+                <TextBlock Text="Library" />
+              </DockPanel>
+            </Button>
+            <Button Classes="nav" Classes.selected="{Binding IsSettingsSection}" Command="{Binding ShowSettingsCommand}" Content="Settings" />
+          </StackPanel>
+        </StackPanel>
+      </DockPanel>
+    </Border>
+
+    <!-- Content -->
+    <Panel>
+      <!-- Library -->
+      <Panel IsVisible="{Binding IsLibrarySection}">
+        <DockPanel DataContext="{Binding Library}" x:DataType="vm:LibraryViewModel" Margin="32,28,32,0">
+          <StackPanel DockPanel.Dock="Top" Spacing="16" Margin="0,0,0,16">
+            <DockPanel>
+              <Button DockPanel.Dock="Right" Content="Add by magnet" Command="{Binding ToggleAddFormCommand}" />
+              <TextBlock Text="Library" FontSize="26" FontWeight="SemiBold" />
+            </DockPanel>
+
+            <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap"
+                       IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+            <!-- Temporary until search exists -->
+            <Border Classes="card" IsVisible="{Binding IsAddFormOpen}">
+              <StackPanel Spacing="10">
+                <StackPanel Orientation="Horizontal" Spacing="16">
+                  <RadioButton Content="Movie" IsChecked="{Binding !NewIsSeries}" GroupName="kind" />
+                  <RadioButton Content="Series" IsChecked="{Binding NewIsSeries}" GroupName="kind" />
+                </StackPanel>
+                <TextBox Text="{Binding NewTitle}" PlaceholderText="Title, e.g. Shogun" />
+                <TextBox Text="{Binding NewSource}" PlaceholderText="magnet:?xt=urn:btih:…" />
+                <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding NewIsSeries}">
+                  <TextBox Width="140" Text="{Binding NewSeason}" PlaceholderText="Season (optional)" />
+                  <TextBox Width="140" Text="{Binding NewEpisode}" PlaceholderText="Episode (optional)" />
+                  <TextBlock Classes="muted" FontSize="12" VerticalAlignment="Center" TextWrapping="Wrap"
+                             Text="Empty season = whole series. New downloads join the existing series." />
+                </StackPanel>
+                <Button Classes="accent" Content="Download to Pi" Command="{Binding AddCommand}" />
+              </StackPanel>
+            </Border>
+
+            <TextBlock Classes="muted" IsVisible="{Binding IsEmpty}"
+                       Text="Nothing here yet. Add a movie or a series and it will download to the Pi." />
+          </StackPanel>
+
+          <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding Items}" Margin="0,0,0,24">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <StackPanel Spacing="10" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:LibraryItemViewModel">
+                  <Border Classes="card">
+                    <StackPanel Spacing="12">
+                      <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="18">
+                        <Border Grid.Column="0" Width="52" Height="76" CornerRadius="6" Background="#2D4A6B" VerticalAlignment="Top">
+                          <TextBlock Text="{Binding Initials}" Foreground="White" FontWeight="SemiBold"
+                                     HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+
+                        <StackPanel Grid.Column="1" Spacing="6">
+                          <TextBlock Text="{Binding Title}" FontSize="16" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                          <TextBlock Classes="muted" FontSize="13" Text="{Binding Subtitle}" />
+                          <ItemsControl ItemsSource="{Binding Downloads}">
+                            <ItemsControl.ItemTemplate>
+                              <DataTemplate x:DataType="vm:DownloadViewModel">
+                                <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                                  <StackPanel Spacing="4">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                      <TextBlock Text="{Binding Label}" FontWeight="SemiBold" FontSize="13" />
+                                      <TextBlock Classes="muted" FontSize="12" Text="{Binding StatusText}" VerticalAlignment="Center"
+                                                 IsVisible="{Binding !IsError}" />
+                                      <TextBlock Classes="error" FontSize="12" Text="{Binding StatusText}" VerticalAlignment="Center"
+                                                 IsVisible="{Binding IsError}" />
+                                    </StackPanel>
+                                    <ProgressBar MaxWidth="360" HorizontalAlignment="Left" Width="360" Minimum="0" Maximum="100"
+                                                 Value="{Binding Percent}" IsVisible="{Binding IsActive}" />
+                                  </StackPanel>
+                                  <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                                    <Button Classes="icon" Command="{Binding PauseCommand}" IsVisible="{Binding IsRunning}" ToolTip.Tip="Pause download">
+                                      <PathIcon Data="M7 5h3v14H7z M14 5h3v14h-3z" Width="12" Height="12" />
+                                    </Button>
+                                    <Button Classes="icon" Command="{Binding ResumeCommand}" IsVisible="{Binding IsPaused}" ToolTip.Tip="Resume download">
+                                      <PathIcon Data="M8 5v14l11-7z" Width="12" Height="12" />
+                                    </Button>
+                                    <Button Classes="icon" Command="{Binding DeleteCommand}" ToolTip.Tip="Delete this download and its files">
+                                      <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" Width="12" Height="12" />
+                                    </Button>
+                                  </StackPanel>
+                                </Grid>
+                              </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                          </ItemsControl>
+                          <Button Padding="0" Background="Transparent" Command="{Binding ToggleEpisodesCommand}"
+                                  IsVisible="{Binding EpisodesSummary, Converter={x:Static ObjectConverters.IsNotNull}}">
+                            <TextBlock Text="{Binding EpisodesSummary}" Foreground="#18794E" FontSize="13" />
+                          </Button>
+                        </StackPanel>
+
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Top">
+                          <Button Classes="accent" Command="{Binding PlayCommand}" IsVisible="{Binding CanPlay}" MinHeight="36">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                              <PathIcon Data="M7 4v16l13-8z" Width="12" Height="12" Foreground="White" />
+                              <TextBlock Text="{Binding PlayLabel}" />
+                            </StackPanel>
+                          </Button>
+                          <Button Classes="icon" Command="{Binding AskDeleteCommand}" ToolTip.Tip="Delete">
+                            <PathIcon Data="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z" Width="14" Height="14" />
+                          </Button>
+                        </StackPanel>
+                      </Grid>
+
+                      <Border IsVisible="{Binding IsConfirmingDelete}" Background="#FBEAE8" CornerRadius="9" Padding="14,10">
+                        <DockPanel>
+                          <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="8">
+                            <Button Content="Cancel" Command="{Binding CancelDeleteCommand}" />
+                            <Button Content="Delete" Command="{Binding ConfirmDeleteCommand}" Background="#C0392B" Foreground="White" />
+                          </StackPanel>
+                          <TextBlock Foreground="#8A2A22" VerticalAlignment="Center" TextWrapping="Wrap">
+                            <Run Text="Delete" />
+                            <Run Text="{Binding Title}" FontWeight="SemiBold" />
+                            <Run Text="and all its files from the Pi? This cannot be undone." />
+                          </TextBlock>
+                        </DockPanel>
+                      </Border>
+
+                      <ItemsControl ItemsSource="{Binding Episodes}" IsVisible="{Binding IsExpanded}">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:EpisodeViewModel">
+                            <Grid ColumnDefinitions="70,*,120,Auto" ColumnSpacing="12" Margin="70,2,0,2">
+                              <TextBlock Grid.Column="0" Text="{Binding Code}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                              <TextBlock Grid.Column="1" Text="{Binding Name}" Classes="muted" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                              <StackPanel Grid.Column="2" Spacing="3" VerticalAlignment="Center">
+                                <ProgressBar Minimum="0" Maximum="100" Value="{Binding WatchedPercent}" />
+                                <TextBlock Classes="muted" FontSize="11" Text="{Binding Remaining}"
+                                           IsVisible="{Binding Remaining, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                <TextBlock Classes="muted" FontSize="11" Text="Watched" IsVisible="{Binding IsWatched}" />
+                              </StackPanel>
+                              <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="6">
+                                <Button Classes="icon" Command="{Binding PlayCommand}" ToolTip.Tip="Play">
+                                  <PathIcon Data="M8 5v14l11-7z" Width="12" Height="12" />
+                                </Button>
+                                <Button Classes="icon" Command="{Binding PlayFromStartCommand}" ToolTip.Tip="Play from the start">
+                                  <PathIcon Data="M6 6h2v12H6zm3.5 6 8.5 6V6z" Width="12" Height="12" />
+                                </Button>
+                              </StackPanel>
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
         </DockPanel>
-        <TextBlock Classes="error" FontSize="12" TextWrapping="Wrap"
-                   Text="{Binding Error}" IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+      </Panel>
+
+      <!-- Settings -->
+      <StackPanel IsVisible="{Binding IsSettingsSection}" Margin="32,28" Spacing="16" MaxWidth="620" HorizontalAlignment="Left">
+        <TextBlock Text="Settings" FontSize="26" FontWeight="SemiBold" />
+        <StackPanel Spacing="8">
+          <TextBlock Text="Agent address" FontWeight="SemiBold" />
+          <DockPanel>
+            <Button DockPanel.Dock="Right" Margin="8,0,0,0" Content="Check" Command="{Binding CheckConnectionCommand}" />
+            <TextBox Text="{Binding AgentUrl}" PlaceholderText="http://sheva-server.local:5080" />
+          </DockPanel>
+          <TextBlock Text="For local development run the agent on this Mac and use http://localhost:5080."
+                     Classes="muted" FontSize="12" TextWrapping="Wrap" />
+        </StackPanel>
       </StackPanel>
-    </StackPanel>
+    </Panel>
   </DockPanel>
 </Window>

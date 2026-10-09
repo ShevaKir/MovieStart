@@ -8,7 +8,8 @@ public interface IPlayer
 
     /// <exception cref="PlayerUnavailableException">The player process is not reachable.</exception>
     /// <exception cref="PlayerCommandException">The player rejected the command.</exception>
-    Task PlayAsync(string path, CancellationToken cancellationToken);
+    /// <param name="startSeconds">Position to start from; 0 plays from the beginning.</param>
+    Task PlayAsync(string path, double startSeconds, CancellationToken cancellationToken);
 
     /// <exception cref="PlayerUnavailableException">The player process is not reachable.</exception>
     /// <exception cref="PlayerCommandException">The player rejected the command.</exception>

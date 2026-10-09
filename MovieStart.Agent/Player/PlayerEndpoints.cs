@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Options;
+using MovieStart.Agent.Media;
 using MovieStart.Shared;
 using MovieStart.Shared.Player;
 
@@ -15,15 +16,15 @@ public static class PlayerEndpoints
     }
 
     private static async Task<IResult> PlayAsync(
-        PlayRequest request, IPlayer player, IOptions<PlayerOptions> options, CancellationToken cancellationToken)
+        PlayRequest request, IPlayer player, IOptions<MediaOptions> media, CancellationToken cancellationToken)
     {
-        if (!MediaPath.TryResolve(options.Value.MediaRoot, request.Path, out var fullPath))
+        if (!MediaPath.TryResolve(media.Value.Root, request.Path, out var fullPath))
             return Results.Problem("The file must be inside the media root.", statusCode: StatusCodes.Status400BadRequest);
 
         if (!File.Exists(fullPath))
             return Results.Problem("File not found.", statusCode: StatusCodes.Status404NotFound);
 
-        return await RunAsync(() => player.PlayAsync(fullPath, cancellationToken));
+        return await RunAsync(() => player.PlayAsync(fullPath, 0, cancellationToken));
     }
 
     private static Task<IResult> SendCommandAsync(PlayerCommand command, IPlayer player, CancellationToken cancellationToken) =>
