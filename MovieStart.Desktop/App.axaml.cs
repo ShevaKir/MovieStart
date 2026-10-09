@@ -17,11 +17,13 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             var options = LoadOptions();
-            var agentClient = new AgentClient(new HttpClient { Timeout = TimeSpan.FromSeconds(3) });
+            // AgentClient sets a timeout per call.
+            var agentClient = new AgentClient(new HttpClient { Timeout = System.Threading.Timeout.InfiniteTimeSpan });
+            var posters = new PosterLoader(new HttpClient { Timeout = TimeSpan.FromSeconds(15) });
 
             desktop.MainWindow = new MainWindow
             {
-                DataContext = new MainWindowViewModel(agentClient, options.AgentUrl),
+                DataContext = new MainWindowViewModel(agentClient, options.AgentUrl, posters),
             };
         }
 

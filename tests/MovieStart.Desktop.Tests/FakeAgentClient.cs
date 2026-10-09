@@ -2,6 +2,7 @@ using MovieStart.Desktop.Services;
 using MovieStart.Shared.Health;
 using MovieStart.Shared.Library;
 using MovieStart.Shared.Player;
+using MovieStart.Shared.Search;
 
 namespace MovieStart.Desktop.Tests;
 
@@ -24,6 +25,12 @@ public sealed class FakeAgentClient : IAgentClient
     public AddToLibraryRequest? Added { get; private set; }
 
     public PlayItemRequest? PlayRequest { get; private set; }
+
+    public List<TitleResult> Titles { get; set; } = [];
+
+    public List<ReleaseInfo> Releases { get; set; } = [];
+
+    public string? ReleaseQuery { get; private set; }
 
     public List<PlayerCommand> Commands { get; } = [];
 
@@ -76,6 +83,17 @@ public sealed class FakeAgentClient : IAgentClient
         PlayRequest = request;
         Calls.Add($"play {itemId}");
         return Task.FromResult(new AgentResult<MediaFile>(null, Result.Error));
+    }
+
+    public Task<AgentResult<IReadOnlyList<TitleResult>>> SearchTitlesAsync(
+        string agentUrl, string query, CancellationToken cancellationToken = default) =>
+        Task.FromResult(new AgentResult<IReadOnlyList<TitleResult>>(Result.IsSuccess ? Titles : null, Result.Error));
+
+    public Task<AgentResult<IReadOnlyList<ReleaseInfo>>> SearchReleasesAsync(
+        string agentUrl, TitleResult title, string? query, CancellationToken cancellationToken = default)
+    {
+        ReleaseQuery = query;
+        return Task.FromResult(new AgentResult<IReadOnlyList<ReleaseInfo>>(Result.IsSuccess ? Releases : null, Result.Error));
     }
 
     private Task<AgentResult> Record(string call)

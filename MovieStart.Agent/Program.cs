@@ -4,6 +4,7 @@ using MovieStart.Agent.Downloads;
 using MovieStart.Agent.Library;
 using MovieStart.Agent.Media;
 using MovieStart.Agent.Player;
+using MovieStart.Agent.Search;
 using MovieStart.Shared;
 using MovieStart.Shared.Health;
 
@@ -15,6 +16,8 @@ builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, relo
 builder.Services.Configure<MediaOptions>(builder.Configuration.GetSection(MediaOptions.SectionName));
 builder.Services.Configure<PlayerOptions>(builder.Configuration.GetSection(PlayerOptions.SectionName));
 builder.Services.Configure<QbitOptions>(builder.Configuration.GetSection(QbitOptions.SectionName));
+builder.Services.Configure<ProwlarrOptions>(builder.Configuration.GetSection(ProwlarrOptions.SectionName));
+builder.Services.Configure<TmdbOptions>(builder.Configuration.GetSection(TmdbOptions.SectionName));
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IStorageProbe, DriveStorageProbe>();
@@ -40,6 +43,10 @@ builder.Services.AddSingleton<LibraryService>();
 builder.Services.AddHostedService<LibraryWatcher>();
 builder.Services.AddHostedService<WatchTracker>();
 
+builder.Services.AddHttpClient<IProwlarrClient, ProwlarrClient>(client => client.Timeout = TimeSpan.FromSeconds(30));
+builder.Services.AddHttpClient<ITmdbClient, TmdbClient>(client => client.Timeout = TimeSpan.FromSeconds(10));
+builder.Services.AddSingleton<SearchService>();
+
 var app = builder.Build();
 
 var version = Assembly.GetExecutingAssembly()
@@ -48,6 +55,7 @@ var version = Assembly.GetExecutingAssembly()
 app.MapGet(ApiRoutes.Health, () => new HealthResponse(version, DateTimeOffset.UtcNow));
 app.MapPlayerEndpoints();
 app.MapLibraryEndpoints();
+app.MapSearchEndpoints();
 
 app.Run();
 

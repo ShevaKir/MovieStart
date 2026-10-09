@@ -67,6 +67,28 @@
       <Setter Property="HorizontalContentAlignment" Value="Center" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
     </Style>
+    <Style Selector="ToggleButton.chip">
+      <Setter Property="MinHeight" Value="34" />
+      <Setter Property="Padding" Value="14,0" />
+      <Setter Property="CornerRadius" Value="17" />
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderBrush" Value="#D6D3CC" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+    </Style>
+    <Style Selector="ToggleButton.chip:checked /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="#E6F4EC" />
+      <Setter Property="BorderBrush" Value="#18794E" />
+      <Setter Property="Foreground" Value="#13603E" />
+    </Style>
+    <Style Selector="Border.tag">
+      <Setter Property="Background" Value="#EEEDE9" />
+      <Setter Property="CornerRadius" Value="5" />
+      <Setter Property="Padding" Value="7,3" />
+    </Style>
+    <Style Selector="Border.tag.preferred">
+      <Setter Property="Background" Value="#E6F4EC" />
+    </Style>
     <Style Selector="Border.card">
       <Setter Property="Background" Value="White" />
       <Setter Property="BorderBrush" Value="#E4E2DD" />
@@ -154,12 +176,7 @@
         <StackPanel Spacing="24">
           <TextBlock Text="MovieStart" FontSize="17" FontWeight="SemiBold" Margin="8,0" />
           <StackPanel Spacing="2">
-            <Button Classes="nav" IsEnabled="False" ToolTip.Tip="Coming next">
-              <DockPanel>
-                <TextBlock DockPanel.Dock="Right" Text="soon" FontSize="11" Classes="muted" VerticalAlignment="Center" />
-                <TextBlock Text="Search" />
-              </DockPanel>
-            </Button>
+            <Button Classes="nav" Classes.selected="{Binding IsSearchSection}" Command="{Binding ShowSearchCommand}" Content="Search" />
             <Button Classes="nav" Classes.selected="{Binding IsLibrarySection}" Command="{Binding ShowLibraryCommand}">
               <DockPanel>
                 <TextBlock DockPanel.Dock="Right" Text="{Binding Library.Items.Count}" FontSize="12" Classes="muted" VerticalAlignment="Center" />
@@ -174,6 +191,200 @@
 
     <!-- Content -->
     <Panel>
+      <!-- Search -->
+      <Panel IsVisible="{Binding IsSearchSection}">
+        <DockPanel DataContext="{Binding Search}" x:DataType="vm:SearchViewModel" Margin="32,28,32,0">
+          <StackPanel DockPanel.Dock="Top" Spacing="16" Margin="0,0,0,16" IsVisible="{Binding IsShowingResults}">
+            <TextBlock Text="Search" FontSize="26" FontWeight="SemiBold" />
+            <DockPanel MaxWidth="720" HorizontalAlignment="Left">
+              <Button DockPanel.Dock="Right" Classes="accent" Margin="8,0,0,0" MinHeight="40" Content="Search" Command="{Binding SearchCommand}" />
+              <TextBox Text="{Binding Query}" MinHeight="40" VerticalContentAlignment="Center" Width="560"
+                       PlaceholderText="Movie or series — in English, Ukrainian or Russian">
+                <TextBox.KeyBindings>
+                  <KeyBinding Gesture="Enter" Command="{Binding SearchCommand}" />
+                </TextBox.KeyBindings>
+              </TextBox>
+            </DockPanel>
+            <TextBlock Classes="muted" Text="Searching…" IsVisible="{Binding IsSearching}" />
+            <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap"
+                       IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          </StackPanel>
+
+          <Panel>
+            <!-- Titles -->
+            <ScrollViewer IsVisible="{Binding IsShowingResults}">
+              <ItemsControl ItemsSource="{Binding Results}" Margin="0,0,0,24">
+                <ItemsControl.ItemsPanel>
+                  <ItemsPanelTemplate>
+                    <WrapPanel ItemSpacing="20" LineSpacing="24" />
+                  </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                  <DataTemplate x:DataType="vm:TitleResultViewModel">
+                    <Button Width="170" Padding="0" Background="Transparent" Command="{Binding OpenCommand}"
+                            HorizontalContentAlignment="Stretch" VerticalContentAlignment="Top">
+                      <StackPanel Spacing="8">
+                        <Border Height="255" CornerRadius="10" Background="#2D4A6B" ClipToBounds="True">
+                          <Panel>
+                            <TextBlock Text="{Binding Initials}" Foreground="White" FontSize="22" FontWeight="SemiBold"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            <Image Source="{Binding Poster}" Stretch="UniformToFill" />
+                            <Border Classes="tag" Background="#E61C1B19" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="8"
+                                    IsVisible="{Binding Rating, Converter={x:Static ObjectConverters.IsNotNull}}">
+                              <TextBlock Text="{Binding Rating}" Foreground="White" FontSize="12" FontWeight="SemiBold" />
+                            </Border>
+                            <Border Classes="tag" Background="#18794E" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="8"
+                                    IsVisible="{Binding IsInLibrary}">
+                              <TextBlock Text="In library" Foreground="White" FontSize="11" FontWeight="SemiBold" />
+                            </Border>
+                          </Panel>
+                        </Border>
+                        <TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding Details}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                      </StackPanel>
+                    </Button>
+                  </DataTemplate>
+                </ItemsControl.ItemTemplate>
+              </ItemsControl>
+            </ScrollViewer>
+
+            <!-- Releases of the selected title -->
+            <DockPanel IsVisible="{Binding !IsShowingResults}">
+              <Button DockPanel.Dock="Top" Padding="0" Margin="0,0,0,12" Background="Transparent" Command="{Binding BackCommand}">
+                <TextBlock Text="← Search results" Classes="muted" />
+              </Button>
+              <DockPanel DataContext="{Binding Selected}" x:DataType="vm:ReleasesViewModel">
+                <StackPanel DockPanel.Dock="Top" Spacing="16" Margin="0,0,0,16">
+                  <Grid ColumnDefinitions="Auto,*" ColumnSpacing="20">
+                    <Border Width="100" Height="150" CornerRadius="8" Background="#2D4A6B" ClipToBounds="True">
+                      <Image Source="{Binding Title.Poster}" Stretch="UniformToFill" />
+                    </Border>
+                    <StackPanel Grid.Column="1" Spacing="6">
+                      <TextBlock Text="{Binding Title.Name}" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
+                      <TextBlock Text="{Binding Title.Details}" Classes="muted" />
+                      <TextBlock Text="{Binding Title.Title.Overview}" TextWrapping="Wrap" MaxWidth="720" HorizontalAlignment="Left"
+                                 MaxLines="4" TextTrimming="WordEllipsis" Foreground="#45433F" />
+                    </StackPanel>
+                  </Grid>
+
+                  <Border Classes="card" Background="White">
+                    <StackPanel Spacing="10">
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="Language" Width="84" Classes="muted" FontSize="12" VerticalAlignment="Center" />
+                        <ItemsControl ItemsSource="{Binding Languages}">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="8" /></ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:FilterChip">
+                              <ToggleButton Classes="chip" Content="{Binding Label}" IsChecked="{Binding IsSelected}" FontWeight="SemiBold" />
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                      <StackPanel Orientation="Horizontal" Spacing="8">
+                        <TextBlock Text="Voice-over" Width="84" Classes="muted" FontSize="12" VerticalAlignment="Center" />
+                        <ItemsControl ItemsSource="{Binding Voices}">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="8" /></ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:FilterChip">
+                              <ToggleButton Classes="chip" Content="{Binding Label}" IsChecked="{Binding IsSelected}" />
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                      <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding HasSeasons}">
+                        <TextBlock Text="Season" Width="84" Classes="muted" FontSize="12" VerticalAlignment="Center" />
+                        <ItemsControl ItemsSource="{Binding Seasons}">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel ItemSpacing="8" LineSpacing="8" /></ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:FilterChip">
+                              <ToggleButton Classes="chip" Content="{Binding Label}" IsChecked="{Binding IsSelected}" />
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                      </StackPanel>
+                      <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap"
+                                 Text="1080p only, cam rips hidden. Best quality first: source, MKV, x265, seeders." />
+                    </StackPanel>
+                  </Border>
+
+                  <StackPanel Orientation="Horizontal" Spacing="10">
+                    <TextBlock Text="Releases" FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock Text="{Binding Summary}" Classes="muted" VerticalAlignment="Bottom" />
+                    <TextBlock Text="Searching trackers…" Classes="muted" VerticalAlignment="Bottom" IsVisible="{Binding IsLoading}" />
+                  </StackPanel>
+                  <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap"
+                             IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                </StackPanel>
+
+                <ScrollViewer>
+                  <ItemsControl ItemsSource="{Binding Releases}" Margin="0,0,0,24">
+                    <ItemsControl.ItemsPanel>
+                      <ItemsPanelTemplate><StackPanel Spacing="10" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                      <DataTemplate x:DataType="vm:ReleaseRowViewModel">
+                        <Border Classes="card" BorderBrush="{Binding IsBest, Converter={x:Static vm:ViewConverters.BestBorder}}">
+                          <Grid ColumnDefinitions="*,Auto" ColumnSpacing="20">
+                            <StackPanel Spacing="8">
+                              <WrapPanel ItemSpacing="8" LineSpacing="4">
+                                <Border Classes="tag" Background="#18794E" IsVisible="{Binding IsBest}">
+                                  <TextBlock Text="BEST MATCH" Foreground="White" FontSize="11" FontWeight="Bold" />
+                                </Border>
+                                <Border Classes="tag" IsVisible="{Binding IsRemux}">
+                                  <TextBlock Text="REMUX · ORIGINAL" FontSize="11" FontWeight="Bold" />
+                                </Border>
+                                <TextBlock Text="{Binding Quality}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding Episodes}" Classes="muted" VerticalAlignment="Center"
+                                           IsVisible="{Binding Episodes, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                              </WrapPanel>
+                              <ItemsControl ItemsSource="{Binding Audio}">
+                                <ItemsControl.ItemsPanel>
+                                  <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="6" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                  <DataTemplate x:DataType="vm:AudioChip">
+                                    <Border Classes="tag" Classes.preferred="{Binding IsPreferred}">
+                                      <TextBlock Text="{Binding Text}" FontSize="12" />
+                                    </Border>
+                                  </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                              </ItemsControl>
+                              <TextBlock Text="{Binding Subtitles}" Classes="muted" FontSize="12"
+                                         IsVisible="{Binding Subtitles, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                              <TextBlock Text="{Binding Release.Title}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+                              <TextBlock Text="{Binding Warning}" Foreground="#9A5B00" FontSize="12" TextWrapping="Wrap"
+                                         IsVisible="{Binding Warning, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="22" VerticalAlignment="Center">
+                              <StackPanel HorizontalAlignment="Right">
+                                <TextBlock Text="{Binding Size}" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                                <TextBlock Text="size" Classes="muted" FontSize="12" HorizontalAlignment="Right" />
+                              </StackPanel>
+                              <StackPanel HorizontalAlignment="Right" MinWidth="48">
+                                <TextBlock Text="{Binding Seeders}" FontWeight="SemiBold" Foreground="#18794E" HorizontalAlignment="Right" />
+                                <TextBlock Text="seeders" Classes="muted" FontSize="12" HorizontalAlignment="Right" />
+                              </StackPanel>
+                              <Button Classes.accent="{Binding !IsAdded}" MinHeight="40"
+                                      Content="{Binding DownloadLabel}" Command="{Binding DownloadCommand}" IsEnabled="{Binding !IsAdded}" />
+                            </StackPanel>
+                          </Grid>
+                        </Border>
+                      </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                  </ItemsControl>
+                </ScrollViewer>
+              </DockPanel>
+            </DockPanel>
+          </Panel>
+        </DockPanel>
+      </Panel>
+
       <!-- Library -->
       <Panel IsVisible="{Binding IsLibrarySection}">
         <DockPanel DataContext="{Binding Library}" x:DataType="vm:LibraryViewModel" Margin="32,28,32,0">

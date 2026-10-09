@@ -11,6 +11,9 @@ public static class ApiRoutes
     public const string Library = "/api/library";
     public const string Storage = "/api/storage";
 
+    public const string SearchTitles = "/api/search/titles";
+    public const string SearchReleases = "/api/search/releases";
+
     public static string LibraryItem(Guid id) => $"{Library}/{id}";
 
     public static string LibraryPlay(Guid id) => $"{Library}/{id}/play";

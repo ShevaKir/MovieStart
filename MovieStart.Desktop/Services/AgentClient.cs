@@ -4,6 +4,7 @@ using MovieStart.Shared;
 using MovieStart.Shared.Health;
 using MovieStart.Shared.Library;
 using MovieStart.Shared.Player;
+using MovieStart.Shared.Search;
 
 namespace MovieStart.Desktop.Services;
 
@@ -44,11 +45,23 @@ public interface IAgentClient
 
     /// <summary>Starts playback on the TV; returns the file that was started.</summary>
     Task<AgentResult<MediaFile>> PlayItemAsync(string agentUrl, Guid itemId, PlayItemRequest request, CancellationToken cancellationToken = default);
+
+    /// <summary>Finds movies and series in TMDB; the query may be Russian, Ukrainian or English.</summary>
+    Task<AgentResult<IReadOnlyList<TitleResult>>> SearchTitlesAsync(string agentUrl, string query, CancellationToken cancellationToken = default);
+
+    /// <summary>Finds 1080p releases of a title, best first.</summary>
+    Task<AgentResult<IReadOnlyList<ReleaseInfo>>> SearchReleasesAsync(
+        string agentUrl, TitleResult title, string? query, CancellationToken cancellationToken = default);
 }
 
+/// <param name="http">Should have no timeout of its own; each call sets one.</param>
 public sealed class AgentClient(HttpClient http) : IAgentClient
 {
     private const string Unreachable = "The agent is not reachable.";
+
+    // Polls and commands must fail fast so "offline" shows quickly; release search fans out to trackers.
+    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(5);
+    private static readonly TimeSpan SearchTimeout = TimeSpan.FromSeconds(45);
 
     public Task<HealthResponse?> GetHealthAsync(string agentUrl, CancellationToken cancellationToken = default) =>
         GetAsync<HealthResponse>(agentUrl, ApiRoutes.Health, cancellationToken);
@@ -94,14 +107,51 @@ public sealed class AgentClient(HttpClient http) : IAgentClient
         return new AgentResult<MediaFile>(started, result.Error);
     }
 
+    public Task<AgentResult<IReadOnlyList<TitleResult>>> SearchTitlesAsync(
+        string agentUrl, string query, CancellationToken cancellationToken = default) =>
+        GetResultAsync<IReadOnlyList<TitleResult>>(
+            agentUrl, $"{ApiRoutes.SearchTitles}?query={Uri.EscapeDataString(query)}", cancellationToken, SearchTimeout);
+
+    public Task<AgentResult<IReadOnlyList<ReleaseInfo>>> SearchReleasesAsync(
+        string agentUrl, TitleResult title, string? query, CancellationToken cancellationToken = default)
+    {
+        var parameters = new Dictionary<string, string?>
+        {
+            ["kind"] = title.Kind.ToString(),
+            ["title"] = title.Title,
+            ["originalTitle"] = title.OriginalTitle,
+            ["year"] = title.Year?.ToString(),
+            ["query"] = query,
+        };
+        var queryString = string.Join("&", parameters
+            .Where(parameter => !string.IsNullOrWhiteSpace(parameter.Value))
+            .Select(parameter => $"{parameter.Key}={Uri.EscapeDataString(parameter.Value!)}"));
+        return GetResultAsync<IReadOnlyList<ReleaseInfo>>(agentUrl, $"{ApiRoutes.SearchReleases}?{queryString}", cancellationToken, SearchTimeout);
+    }
+
+    /// <summary>GET that reports why it failed, unlike the polling reads that just return null.</summary>
+    private async Task<AgentResult<T>> GetResultAsync<T>(string agentUrl, string route, CancellationToken cancellationToken, TimeSpan timeout)
+    {
+        T? value = default;
+        var result = await SendAsync(
+            agentUrl,
+            HttpMethod.Get,
+            route,
+            cancellationToken,
+            readSuccess: async response => value = await response.Content.ReadFromJsonAsync<T>(cancellationToken),
+            timeout: timeout);
+        return new AgentResult<T>(value, result.Error);
+    }
+
     private async Task<T?> GetAsync<T>(string agentUrl, string route, CancellationToken cancellationToken) where T : class
     {
         if (!Uri.TryCreate(agentUrl, UriKind.Absolute, out var baseUri))
             return null;
 
+        using var timeout = Timeout(DefaultTimeout, cancellationToken);
         try
         {
-            return await http.GetFromJsonAsync<T>(new Uri(baseUri, route), cancellationToken);
+            return await http.GetFromJsonAsync<T>(new Uri(baseUri, route), timeout.Token);
         }
         catch (Exception ex) when (IsConnectionFailure(ex))
         {
@@ -118,15 +168,17 @@ public sealed class AgentClient(HttpClient http) : IAgentClient
         string route,
         CancellationToken cancellationToken,
         HttpContent? content = null,
-        Func<HttpResponseMessage, Task>? readSuccess = null)
+        Func<HttpResponseMessage, Task>? readSuccess = null,
+        TimeSpan? timeout = null)
     {
         if (!Uri.TryCreate(agentUrl, UriKind.Absolute, out var baseUri))
             return AgentResult.Failure("The agent address is not a valid URL.");
 
+        using var deadline = Timeout(timeout ?? DefaultTimeout, cancellationToken);
         try
         {
             using var request = new HttpRequestMessage(method, new Uri(baseUri, route)) { Content = content };
-            using var response = await http.SendAsync(request, cancellationToken);
+            using var response = await http.SendAsync(request, deadline.Token);
             if (!response.IsSuccessStatusCode)
             {
                 return AgentResult.Failure(await ReadProblemDetailAsync(response, cancellationToken)
@@ -154,6 +206,13 @@ public sealed class AgentClient(HttpClient http) : IAgentClient
         {
             return null;
         }
+    }
+
+    private static CancellationTokenSource Timeout(TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        var source = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        source.CancelAfter(timeout);
+        return source;
     }
 
     private static bool IsConnectionFailure(Exception ex) =>

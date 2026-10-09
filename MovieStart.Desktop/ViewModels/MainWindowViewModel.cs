@@ -19,25 +19,33 @@ public partial class MainWindowViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(StatusText))]
     private string? _agentVersion;
 
-    public MainWindowViewModel(IAgentClient agentClient, string agentUrl)
+    public MainWindowViewModel(IAgentClient agentClient, string agentUrl, IPosterLoader posters)
     {
         _agentClient = agentClient;
         _agentUrl = agentUrl;
         Player = new PlayerViewModel(agentClient, () => AgentUrl);
         Library = new LibraryViewModel(agentClient, () => AgentUrl);
+        Search = new SearchViewModel(agentClient, () => AgentUrl, Library, posters);
     }
 
     public PlayerViewModel Player { get; }
 
     public LibraryViewModel Library { get; }
 
+    public SearchViewModel Search { get; }
+
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsLibrarySection), nameof(IsSettingsSection))]
+    [NotifyPropertyChangedFor(nameof(IsSearchSection), nameof(IsLibrarySection), nameof(IsSettingsSection))]
     private Section _currentSection = Section.Library;
+
+    public bool IsSearchSection => CurrentSection == Section.Search;
 
     public bool IsLibrarySection => CurrentSection == Section.Library;
 
     public bool IsSettingsSection => CurrentSection == Section.Settings;
+
+    [RelayCommand]
+    private void ShowSearch() => CurrentSection = Section.Search;
 
     [RelayCommand]
     private void ShowLibrary() => CurrentSection = Section.Library;
@@ -77,6 +85,7 @@ public partial class MainWindowViewModel : ObservableObject
 
 public enum Section
 {
+    Search,
     Library,
     Settings,
 }

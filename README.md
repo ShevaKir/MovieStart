@@ -2,7 +2,7 @@
 
 A Mac desktop app that finds movies, downloads them to a Raspberry Pi 5, and plays them on a TV connected to the Pi over HDMI.
 
-> Status: early stage — player control and the download library are in place; search is next.
+> Status: search, downloads, library and player control are in place; not yet deployed to the Pi.
 
 ## How it works
 
@@ -25,6 +25,7 @@ Mac (MovieStart.Desktop)                Raspberry Pi 5 (sheva-server.local)
 
 ## Features
 
+- Search in English, Ukrainian or Russian: TMDB for titles, Prowlarr for releases (rutracker, kinozal, rutor, Toloka).
 - 1080p only; CAMRip/TS releases are filtered out.
 - Release ranking: voice-over profile → source (BDRip > WEB-DL > WEBRip) → MKV → x265 10-bit → seeders.
 - Filters by audio language (UKR / RUS / ENG) and voice-over type (dub, multi-voice, single-voice author, original).
