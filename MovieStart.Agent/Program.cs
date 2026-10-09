@@ -11,7 +11,11 @@ using MovieStart.Shared.Health;
 var builder = WebApplication.CreateBuilder(args);
 
 // Personal overrides for local development; not committed.
-builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true);
+// Environment variables and the command line are added again so they still win, e.g. systemd settings on the Pi.
+builder.Configuration
+    .AddJsonFile("appsettings.Local.json", optional: true, reloadOnChange: true)
+    .AddEnvironmentVariables()
+    .AddCommandLine(args);
 
 builder.Services.Configure<MediaOptions>(builder.Configuration.GetSection(MediaOptions.SectionName));
 builder.Services.Configure<PlayerOptions>(builder.Configuration.GetSection(PlayerOptions.SectionName));
