@@ -25,6 +25,7 @@ public partial class PlayerViewModel : ObservableObject
     private CancellationTokenSource? _pendingVolume;
     private DateTime _ignorePositionUntil;
     private DateTime _ignoreVolumeUntil;
+    private DateTime _ignorePauseUntil;
     private Task _lastSend = Task.CompletedTask;
 
     [ObservableProperty]
@@ -110,7 +111,8 @@ public partial class PlayerViewModel : ObservableObject
             IsConnected = state.IsConnected;
             IsIdle = state.IsIdle;
             Title = state.IsIdle ? NothingPlaying : state.Title ?? Path.GetFileName(state.FilePath) ?? NothingPlaying;
-            IsPaused = state.IsPaused;
+            if (DateTime.UtcNow >= _ignorePauseUntil)
+                IsPaused = state.IsPaused;
 
             // Duration first: it is the slider maximum.
             Duration = state.Duration;
@@ -135,8 +137,16 @@ public partial class PlayerViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
-    private Task TogglePauseAsync() => SendAsync(IsPaused ? PlayerCommand.Resume() : PlayerCommand.Pause());
+    // Flips at once: a poll still carrying the old state must not undo the click, or every second press repeats the first.
+    // Concurrent so a quick second press is not swallowed while the first request is in flight.
+    [RelayCommand(AllowConcurrentExecutions = true)]
+    private Task TogglePauseAsync()
+    {
+        var pause = !IsPaused;
+        _ignorePauseUntil = DateTime.UtcNow + UserChangeGrace;
+        IsPaused = pause;
+        return SendAsync(pause ? PlayerCommand.Pause() : PlayerCommand.Resume());
+    }
 
     [RelayCommand]
     private Task SeekBackAsync() => SendAsync(PlayerCommand.SeekRelative(-30));

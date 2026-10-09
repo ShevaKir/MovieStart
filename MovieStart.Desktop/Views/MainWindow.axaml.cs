@@ -1,4 +1,6 @@
 using Avalonia.Controls;
+using Avalonia.Input;
+using Avalonia.Interactivity;
 using MovieStart.Desktop.ViewModels;
 
 namespace MovieStart.Desktop.Views;
@@ -14,6 +16,32 @@ public partial class MainWindow : Window
     public MainWindow()
     {
         InitializeComponent();
+        // Tunnel: handled before a focused button turns Space into a click.
+        AddHandler(KeyDownEvent, OnRemoteKeyDown, RoutingStrategies.Tunnel);
+    }
+
+    /// <summary>Space plays or pauses, Left and Right seek, while something plays on the TV.</summary>
+    private void OnRemoteKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.KeyModifiers != KeyModifiers.None || DataContext is not MainWindowViewModel { Player: { HasMedia: true } player })
+            return;
+
+        // Typing a search query or choosing a track keeps its keys.
+        if (TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement() is TextBox or ComboBox)
+            return;
+
+        var command = e.Key switch
+        {
+            Key.Space => player.TogglePauseCommand,
+            Key.Left => player.SeekBackCommand,
+            Key.Right => player.SeekForwardCommand,
+            _ => null,
+        };
+        if (command is null)
+            return;
+
+        command.Execute(null);
+        e.Handled = true;
     }
 
     protected override void OnOpened(EventArgs e)
