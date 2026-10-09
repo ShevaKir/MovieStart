@@ -2,7 +2,7 @@
 
 A Mac desktop app that finds movies, downloads them to a Raspberry Pi 5, and plays them on a TV connected to the Pi over HDMI.
 
-> Status: early stage — design. No code yet.
+> Status: early stage — solution skeleton with an agent health check.
 
 ## How it works
 
@@ -35,9 +35,10 @@ Mac (MovieStart.Desktop)                Raspberry Pi 5 (sheva-server.local)
 
 ```
 MovieStart.slnx
-├─ src/MovieStart.Desktop   — Avalonia UI, macOS
-├─ src/MovieStart.Agent     — ASP.NET Core minimal API, linux-arm64
-└─ src/MovieStart.Shared    — DTOs and API contracts
+├─ MovieStart.Agent         — ASP.NET Core minimal API, linux-arm64
+├─ MovieStart.Desktop       — Avalonia UI, macOS
+├─ MovieStart.Shared        — DTOs and API contracts
+└─ tests/                   — one xUnit project per project
 ```
 
 ## Requirements
@@ -50,8 +51,17 @@ MovieStart.slnx
 The agent also runs on a Mac (mpv and qBittorrent via Homebrew), so the Pi is only needed to verify TV output and to deploy.
 
 ```bash
+cp MovieStart.Desktop/appsettings.Local.example.json MovieStart.Desktop/appsettings.Local.json  # point the app at localhost
+dotnet run --project MovieStart.Agent     # http://localhost:5080
+dotnet run --project MovieStart.Desktop
+dotnet test --solution MovieStart.slnx
+```
+
+Local overrides go into `appsettings.Local.json` (gitignored). Port 5000 is avoided because macOS AirPlay Receiver uses it.
+
+```bash
 # deploy the agent to the Pi
-dotnet publish src/MovieStart.Agent -c Release -r linux-arm64 --self-contained -o out
+dotnet publish MovieStart.Agent -c Release -r linux-arm64 --self-contained -o out
 rsync -a out/ <user>@sheva-server.local:/opt/moviestart/
 ssh <user>@sheva-server.local sudo systemctl restart moviestart-agent
 ```
