@@ -160,6 +160,40 @@ public class LibraryViewModelTests
     }
 
     [Fact]
+    public async Task SeasonDeleteNeedsConfirmation()
+    {
+        var item = new LibraryItemViewModel(_library, Series(null, Episode(1)));
+        var season = Assert.Single(item.Downloads);
+        Assert.True(season.CanDelete);
+        Assert.Equal("Delete Season 1 and its files from the Pi?", season.DeleteQuestion);
+
+        season.AskDeleteCommand.Execute(null);
+        Assert.Empty(_agent.Calls);
+
+        await season.ConfirmDeleteCommand.ExecuteAsync(null);
+        Assert.Single(_agent.Calls);
+    }
+
+    [Fact]
+    public void MovieWithOneDownloadIsDeletedOnlyAsAWhole()
+    {
+        Guid[] downloads = [Guid.NewGuid(), Guid.NewGuid()];
+        var movie = new LibraryItem
+        {
+            Id = Guid.NewGuid(),
+            Kind = MediaKind.Movie,
+            Title = "Dune",
+            Downloads = [new LibraryDownload { Id = downloads[0], Status = DownloadStatus.Ready }],
+        };
+
+        var item = new LibraryItemViewModel(_library, movie);
+        Assert.False(Assert.Single(item.Downloads).CanDelete);
+
+        item.Update(movie with { Downloads = [.. movie.Downloads, new LibraryDownload { Id = downloads[1], Status = DownloadStatus.Error }] });
+        Assert.All(item.Downloads, download => Assert.True(download.CanDelete));
+    }
+
+    [Fact]
     public void DownloadRowsDescribeProgress()
     {
         var download = new LibraryDownload

@@ -107,12 +107,22 @@
                               <Button Classes="icon" Command="{Binding ResumeCommand}" IsVisible="{Binding IsPaused}" ToolTip.Tip="Resume download">
                                 <PathIcon Data="M8 5v14l11-7z" Width="13" Height="13" />
                               </Button>
-                              <Button Classes="icon" Command="{Binding DeleteCommand}" ToolTip.Tip="Delete this download and its files">
+                              <Button Classes="icon" Command="{Binding AskDeleteCommand}" IsVisible="{Binding CanDelete}"
+                                      ToolTip.Tip="Delete this download and its files">
                                 <PathIcon Data="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
                                           Width="12" Height="12" />
                               </Button>
                             </StackPanel>
                           </Grid>
+                          <Border IsVisible="{Binding IsConfirmingDelete}" Background="#FBEAE8" CornerRadius="8" Padding="14,10">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                              <TextBlock Foreground="#8A2A22" VerticalAlignment="Center" TextWrapping="Wrap" Text="{Binding DeleteQuestion}" />
+                              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                                <Button Content="Cancel" Command="{Binding CancelDeleteCommand}" />
+                                <Button Classes="danger" Content="Delete" Command="{Binding ConfirmDeleteCommand}" />
+                              </StackPanel>
+                            </Grid>
+                          </Border>
                         </StackPanel>
                       </DataTemplate>
                     </ItemsControl.ItemTemplate>
