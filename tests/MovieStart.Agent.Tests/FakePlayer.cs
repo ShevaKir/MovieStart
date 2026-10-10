@@ -13,6 +13,8 @@ public sealed class FakePlayer : IPlayer
 
     public double? PlayedStart => PlayedOptions?.StartSeconds;
 
+    public int PlayCount { get; private set; }
+
     public PlayerCommand? LastCommand { get; private set; }
 
     public Exception? Failure { get; set; }
@@ -23,6 +25,7 @@ public sealed class FakePlayer : IPlayer
             throw Failure;
         PlayedPath = path;
         PlayedOptions = options;
+        PlayCount++;
         return Task.CompletedTask;
     }
 
