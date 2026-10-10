@@ -33,5 +33,8 @@ public sealed record LibraryDownload
 
     public string? Error { get; init; }
 
+    /// <summary>Files of the torrent with what is being fetched; null until the torrent's metadata has arrived.</summary>
+    public IReadOnlyList<DownloadFile>? Files { get; init; }
+
     public DateTimeOffset AddedAt { get; init; }
 }

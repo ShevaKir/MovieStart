@@ -36,6 +36,12 @@ public static class LibraryEndpoints
         app.MapDelete(download, (Guid id, Guid downloadId, LibraryService library, CancellationToken cancellationToken) =>
             RunAsync(() => library.DeleteDownloadAsync(id, downloadId, cancellationToken)));
 
+        app.MapPut(download + "/files", (Guid id, Guid downloadId, SelectFilesRequest request, LibraryService library, CancellationToken cancellationToken) =>
+            RunAsync(() => library.SelectFilesAsync(id, downloadId, request, cancellationToken)));
+
+        app.MapDelete(item + "/files/{fileId:int}", (Guid id, int fileId, LibraryService library, CancellationToken cancellationToken) =>
+            RunAsync(() => library.DeleteFileAsync(id, fileId, cancellationToken)));
+
         app.MapPost(download + "/pause", (Guid id, Guid downloadId, LibraryService library, CancellationToken cancellationToken) =>
             RunAsync(() => library.PauseDownloadAsync(id, downloadId, cancellationToken)));
 

@@ -34,4 +34,10 @@ public static class ApiRoutes
     public static string LibraryDownloadPause(Guid id, Guid downloadId) => $"{LibraryDownload(id, downloadId)}/pause";
 
     public static string LibraryDownloadResume(Guid id, Guid downloadId) => $"{LibraryDownload(id, downloadId)}/resume";
+
+    /// <summary>PUT: choose which files of the torrent to download.</summary>
+    public static string LibraryDownloadFiles(Guid id, Guid downloadId) => $"{LibraryDownload(id, downloadId)}/files";
+
+    /// <summary>DELETE: remove one downloaded file, e.g. a watched episode.</summary>
+    public static string LibraryFile(Guid id, int fileId) => $"{Library}/{id}/files/{fileId}";
 }

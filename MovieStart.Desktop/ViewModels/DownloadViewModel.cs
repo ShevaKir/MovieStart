@@ -1,14 +1,33 @@
+using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MovieStart.Shared.Library;
 
 namespace MovieStart.Desktop.ViewModels;
 
-public partial class DownloadViewModel(LibraryViewModel library, Guid itemId, LibraryDownload download)
-    : ObservableObject, IKeyed<Guid>
+public partial class DownloadViewModel : ObservableObject, IKeyed<Guid>
 {
+    private readonly LibraryViewModel _library;
+    private readonly Guid _itemId;
+
     [ObservableProperty]
-    private LibraryDownload _download = download;
+    private LibraryDownload _download;
+
+    /// <summary>Set by the item: episodes can be picked only for series.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanChooseEpisodes), nameof(StatusText))]
+    private bool _isSeries;
+
+    [ObservableProperty]
+    private bool _isChoosingEpisodes;
+
+    public DownloadViewModel(LibraryViewModel library, Guid itemId, LibraryDownload download)
+    {
+        _library = library;
+        _itemId = itemId;
+        _download = download;
+        SyncEpisodes();
+    }
 
     /// <summary>
     /// Only when the item has something left after it: a movie's single download goes with the whole item (the bin).
@@ -20,6 +39,13 @@ public partial class DownloadViewModel(LibraryViewModel library, Guid itemId, Li
     private bool _isConfirmingDelete;
 
     public Guid Key => Download.Id;
+
+    /// <summary>Episodes of the torrent while it downloads; untick one to skip it.</summary>
+    public ObservableCollection<DownloadFileViewModel> Episodes { get; } = [];
+
+    public bool CanChooseEpisodes => IsSeries && IsActive && Episodes.Count > 1;
+
+    public string EpisodesChosen => $"Episodes: {Episodes.Count(episode => episode.IsWanted)} of {Episodes.Count}";
 
     public string Label => Download switch
     {
@@ -53,25 +79,71 @@ public partial class DownloadViewModel(LibraryViewModel library, Guid itemId, Li
         DownloadStatus.Downloading => string.Join(" · ", new[]
         {
             $"{Percent:0}%",
+            Downloaded,
             Format.Speed(Download.DownloadSpeed),
             Download.EtaSeconds is { } eta ? Format.Eta(eta) : null,
         }.Where(part => part is not null)),
-        DownloadStatus.Paused => $"Paused · {Percent:0}%",
-        DownloadStatus.Ready => Download.SizeBytes > 0 ? $"Downloaded · {Format.Size(Download.SizeBytes)}" : "Downloaded",
+        DownloadStatus.Paused => string.Join(" · ", new[] { "Paused", $"{Percent:0}%", Downloaded }.Where(part => part is not null)),
+        DownloadStatus.Ready => ReadyText,
         _ => Download.Error ?? "Failed",
     };
+
+    /// <summary>A season tells how many of its episodes are on the Pi; the rest can be fetched from the episode list.</summary>
+    private string ReadyText
+    {
+        get
+        {
+            var size = Download.SizeBytes > 0 ? Format.Size(Download.SizeBytes) : null;
+            if (!IsSeries || Episodes.Count <= 1)
+                return size is null ? "Downloaded" : $"Downloaded · {size}";
+
+            var onPi = Episodes.Count(episode => episode.IsWanted);
+            return onPi == 0
+                ? $"No episodes on the Pi · {Episodes.Count} available"
+                : string.Join(" · ", new[] { $"{onPi} of {Episodes.Count} episodes on the Pi", size }.Where(part => part is not null));
+        }
+    }
+
+    /// <summary>"3.2 / 9.4 GB"; null until the torrent size is known.</summary>
+    private string? Downloaded => Download.SizeBytes > 0
+        ? Format.SizeProgress((long)(Download.SizeBytes * Download.Progress), Download.SizeBytes)
+        : null;
 
     public void Update(LibraryDownload download)
     {
         Download = download;
+        SyncEpisodes();
         OnPropertyChanged(string.Empty);
     }
 
-    [RelayCommand]
-    private Task PauseAsync() => library.PauseDownloadAsync(itemId, Download.Id);
+    /// <summary>Sends the ticked episodes; files that are not episodes (subtitles, audio) keep their state.</summary>
+    internal Task SendSelectionAsync()
+    {
+        OnPropertyChanged(nameof(EpisodesChosen));
+        var ticked = Episodes.Where(episode => episode.IsWanted).Select(episode => episode.Key).ToHashSet();
+        var wanted = (Download.Files ?? [])
+            .Where(file => file.IsVideo ? ticked.Contains(file.Index) : file.Wanted)
+            .Select(file => file.Index)
+            .ToList();
+        return _library.SelectDownloadFilesAsync(_itemId, Download.Id, wanted);
+    }
+
+    private void SyncEpisodes() =>
+        CollectionSync.Sync(
+            Episodes,
+            Download.Files?.Where(file => file.IsVideo).ToList() ?? [],
+            file => file.Index,
+            file => new DownloadFileViewModel(this, file),
+            (vm, file) => vm.Update(file));
 
     [RelayCommand]
-    private Task ResumeAsync() => library.ResumeDownloadAsync(itemId, Download.Id);
+    private Task PauseAsync() => _library.PauseDownloadAsync(_itemId, Download.Id);
+
+    [RelayCommand]
+    private Task ResumeAsync() => _library.ResumeDownloadAsync(_itemId, Download.Id);
+
+    [RelayCommand]
+    private void ToggleEpisodeChoice() => IsChoosingEpisodes = !IsChoosingEpisodes;
 
     [RelayCommand]
     private void AskDelete() => IsConfirmingDelete = true;
@@ -83,6 +155,6 @@ public partial class DownloadViewModel(LibraryViewModel library, Guid itemId, Li
     private Task ConfirmDeleteAsync()
     {
         IsConfirmingDelete = false;
-        return library.DeleteDownloadAsync(itemId, Download.Id);
+        return _library.DeleteDownloadAsync(_itemId, Download.Id);
     }
 }

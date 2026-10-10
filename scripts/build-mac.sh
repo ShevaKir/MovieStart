@@ -31,10 +31,19 @@ cat > "$app/Contents/Info.plist" <<PLIST
   <key>LSMinimumSystemVersion</key><string>12.0</string>
   <key>NSHighResolutionCapable</key><true/>
   <key>NSPrincipalClass</key><string>NSApplication</string>
+  <!-- macOS asks before an app talks to devices on the local network, such as the Pi. -->
+  <key>NSLocalNetworkUsageDescription</key><string>MovieStart connects to the MovieStart agent on your Raspberry Pi to search, download and play movies.</string>
 </dict>
 </plist>
 PLIST
 
-# Ad-hoc signature: enough to run locally on Apple Silicon.
-codesign --force --deep --sign - "$app"
+# A stable identity (scripts/create-signing-cert.sh) keeps the Local Network permission
+# across rebuilds; the ad-hoc fallback runs too, but macOS forgets the permission each build.
+identity="${MOVIESTART_SIGN_IDENTITY:-MovieStart Local}"
+if security find-identity -v -p codesigning | grep -q "\"$identity\""; then
+  codesign --force --deep --sign "$identity" "$app"
+else
+  echo "Signing identity \"$identity\" not found, signing ad-hoc (run scripts/create-signing-cert.sh)." >&2
+  codesign --force --deep --sign - "$app"
+fi
 echo "Built $app"

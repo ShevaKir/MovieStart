@@ -13,6 +13,18 @@ public static class Format
         _ => (bytes / 1024d).ToString("0 KB", Culture),
     };
 
+    /// <summary>"3.2 / 9.4 GB": both numbers in the unit of the total.</summary>
+    public static string SizeProgress(long done, long total)
+    {
+        var (unit, format, name) = total switch
+        {
+            >= 1L << 30 => (1L << 30, "0.0", "GB"),
+            >= 1L << 20 => (1L << 20, "0", "MB"),
+            _ => (1024L, "0", "KB"),
+        };
+        return $"{(done / (double)unit).ToString(format, Culture)} / {(total / (double)unit).ToString(format, Culture)} {name}";
+    }
+
     public static string Speed(long bytesPerSecond) => bytesPerSecond >= 1L << 20
         ? (bytesPerSecond / (double)(1L << 20)).ToString("0.0 MB/s", Culture)
         : (bytesPerSecond / 1024d).ToString("0 KB/s", Culture);

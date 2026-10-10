@@ -44,6 +44,11 @@ public interface IAgentClient
 
     Task<AgentResult> ResumeDownloadAsync(string agentUrl, Guid itemId, Guid downloadId, CancellationToken cancellationToken = default);
 
+    Task<AgentResult> SelectDownloadFilesAsync(
+        string agentUrl, Guid itemId, Guid downloadId, SelectFilesRequest request, CancellationToken cancellationToken = default);
+
+    Task<AgentResult> DeleteFileAsync(string agentUrl, Guid itemId, int fileId, CancellationToken cancellationToken = default);
+
     /// <summary>Starts playback on the TV; returns the file that was started.</summary>
     Task<AgentResult<MediaFile>> PlayItemAsync(string agentUrl, Guid itemId, PlayItemRequest request, CancellationToken cancellationToken = default);
 
@@ -103,6 +108,13 @@ public sealed class AgentClient(HttpClient http) : IAgentClient
 
     public Task<AgentResult> ResumeDownloadAsync(string agentUrl, Guid itemId, Guid downloadId, CancellationToken cancellationToken = default) =>
         SendAsync(agentUrl, HttpMethod.Post, ApiRoutes.LibraryDownloadResume(itemId, downloadId), cancellationToken);
+
+    public Task<AgentResult> SelectDownloadFilesAsync(
+        string agentUrl, Guid itemId, Guid downloadId, SelectFilesRequest request, CancellationToken cancellationToken = default) =>
+        SendAsync(agentUrl, HttpMethod.Put, ApiRoutes.LibraryDownloadFiles(itemId, downloadId), cancellationToken, JsonContent.Create(request));
+
+    public Task<AgentResult> DeleteFileAsync(string agentUrl, Guid itemId, int fileId, CancellationToken cancellationToken = default) =>
+        SendAsync(agentUrl, HttpMethod.Delete, ApiRoutes.LibraryFile(itemId, fileId), cancellationToken);
 
     public async Task<AgentResult<MediaFile>> PlayItemAsync(
         string agentUrl, Guid itemId, PlayItemRequest request, CancellationToken cancellationToken = default)

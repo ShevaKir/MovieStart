@@ -44,10 +44,24 @@ public sealed record QbitTorrent
 /// <summary>Subset of <c>/api/v2/torrents/files</c>.</summary>
 public sealed record QbitFile
 {
+    /// <summary>Position in the torrent; what <c>torrents/filePrio</c> takes as id.</summary>
+    [JsonPropertyName("index")]
+    public int Index { get; init; }
+
     /// <summary>Path relative to the torrent save path.</summary>
     [JsonPropertyName("name")]
     public string Name { get; init; } = string.Empty;
 
     [JsonPropertyName("size")]
     public long Size { get; init; }
+
+    /// <summary>0–1.</summary>
+    [JsonPropertyName("progress")]
+    public double Progress { get; init; }
+
+    /// <summary>0 means the file is skipped.</summary>
+    [JsonPropertyName("priority")]
+    public int Priority { get; init; } = QbitClient.NormalPriority;
+
+    public bool IsWanted => Priority != QbitClient.SkipPriority;
 }

@@ -47,8 +47,16 @@ public sealed class FakeQbitClient : IQbitClient
         return Task.FromResult<IReadOnlyList<QbitTorrent>>(Torrents.ToList());
     }
 
-    public Task<IReadOnlyList<QbitFile>> GetFilesAsync(string hash, CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<QbitFile>>(Files.GetValueOrDefault(hash) ?? []);
+    /// <summary>
+    /// Files are numbered by position, like qBittorrent does, so tests can leave the index out.
+    /// Wanted files without their own progress follow the torrent's.
+    /// </summary>
+    public Task<IReadOnlyList<QbitFile>> GetFilesAsync(string hash, CancellationToken cancellationToken)
+    {
+        var progress = Torrents.FirstOrDefault(t => t.Hash == hash)?.Progress ?? 0;
+        return Task.FromResult<IReadOnlyList<QbitFile>>(
+            Indexed(hash).Select(file => file.IsWanted && file.Progress == 0 ? file with { Progress = progress } : file).ToList());
+    }
 
     public Task PauseAsync(string hash, CancellationToken cancellationToken)
     {
@@ -61,6 +69,30 @@ public sealed class FakeQbitClient : IQbitClient
         Resumed.Add(hash);
         return Task.CompletedTask;
     }
+
+    public List<string> Rechecked { get; } = [];
+
+    public Task RecheckAsync(string hash, CancellationToken cancellationToken)
+    {
+        Rechecked.Add(hash);
+        return Task.CompletedTask;
+    }
+
+    public Task SetFilePriorityAsync(string hash, IReadOnlyCollection<int> indexes, int priority, CancellationToken cancellationToken)
+    {
+        if (indexes.Count == 0)
+            return Task.CompletedTask;
+        if (Files.ContainsKey(hash))
+            Files[hash] = Indexed(hash).Select(file => indexes.Contains(file.Index) ? file with { Priority = priority } : file).ToList();
+        PriorityChanges.Add($"{hash}:{string.Join('|', indexes)}={priority}");
+        return Task.CompletedTask;
+    }
+
+    /// <summary>"hash:1|2=0" per call, easy to compare.</summary>
+    public List<string> PriorityChanges { get; } = [];
+
+    private List<QbitFile> Indexed(string hash) =>
+        (Files.GetValueOrDefault(hash) ?? []).Select((file, index) => file with { Index = index }).ToList();
 
     public Task DeleteAsync(string hash, bool deleteFiles, CancellationToken cancellationToken)
     {
