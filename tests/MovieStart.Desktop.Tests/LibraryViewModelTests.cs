@@ -225,6 +225,56 @@ public class LibraryViewModelTests
     }
 
     [Fact]
+    public async Task SeasonListsEpisodesOnThePiAndTheOnesLeftToDownload()
+    {
+        var downloadId = Guid.NewGuid();
+        var download = new LibraryDownload
+        {
+            Id = downloadId,
+            Season = 1,
+            Status = DownloadStatus.Ready,
+            Files =
+            [
+                new DownloadFile(0, "S01/E01.mkv", 2 * Gb, Wanted: false, IsVideo: true, Season: 1, Episode: 1),
+                new DownloadFile(1, "S01/E02.mkv", 2 * Gb, Wanted: true, IsVideo: true, Season: 1, Episode: 2),
+                new DownloadFile(2, "S01/E03.mkv", 2 * Gb, Wanted: false, IsVideo: true, Season: 1, Episode: 3),
+                new DownloadFile(3, "S01/Subs/E01.srt", 1_000, Wanted: true),
+            ],
+        };
+        var onPi = new MediaFile(7, downloadId, $"{downloadId:N}/S01/E02.mkv", 2 * Gb, 1, 2);
+        var item = new LibraryItemViewModel(_library, Series(null, onPi) with { Downloads = [download] });
+
+        Assert.Equal(["S01E01", "S01E02", "S01E03"], item.Episodes.Select(episode => episode.Code));
+        Assert.Equal([false, true, false], item.Episodes.Select(episode => episode.IsOnPi));
+        Assert.Equal("Not downloaded · 2.0 GB", item.Episodes[0].FetchStatus);
+        Assert.Equal("1 episode · 0 watched · 2 not downloaded", item.EpisodesSummary);
+        Assert.Equal("1 of 3 episodes on the Pi", Assert.Single(item.Downloads).StatusText);
+
+        await item.Episodes[2].FetchCommand.ExecuteAsync(null);
+
+        Assert.Contains($"select {downloadId} 1,3,2", _agent.Calls);
+    }
+
+    [Fact]
+    public void EpisodeBeingFetchedShowsItsDownload()
+    {
+        var download = new LibraryDownload
+        {
+            Id = Guid.NewGuid(),
+            Season = 1,
+            Status = DownloadStatus.Downloading,
+            Files = [new DownloadFile(0, "S01/E01.mkv", 2 * Gb, Wanted: true, IsVideo: true, Season: 1, Episode: 1)],
+        };
+
+        var item = new LibraryItemViewModel(_library, Series(null) with { Downloads = [download] });
+
+        var episode = Assert.Single(item.Episodes);
+        Assert.True(episode.IsFetching);
+        Assert.False(episode.CanFetch);
+        Assert.Equal("Downloading…", episode.FetchStatus);
+    }
+
+    [Fact]
     public async Task EpisodeDeleteNeedsConfirmation()
     {
         var item = new LibraryItemViewModel(_library, Series(null, Episode(1), Episode(2)));
@@ -234,7 +284,7 @@ public class LibraryViewModelTests
         Assert.Empty(_agent.Calls);
 
         await episode.ConfirmDeleteCommand.ExecuteAsync(null);
-        Assert.Equal($"delete file {episode.File.Id}", _agent.Calls[0]);
+        Assert.Equal($"delete file {episode.File!.Id}", _agent.Calls[0]);
     }
 
     [Fact]

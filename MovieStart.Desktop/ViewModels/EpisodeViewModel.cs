@@ -4,11 +4,24 @@ using MovieStart.Shared.Library;
 
 namespace MovieStart.Desktop.ViewModels;
 
-public partial class EpisodeViewModel(LibraryViewModel library, Guid itemId, MediaFile file)
-    : ObservableObject, IKeyed<int>
+/// <summary>
+/// One episode of a series: either a file on the Pi (<see cref="File"/>), or an episode of a season torrent
+/// that is not on the Pi yet (<see cref="Download"/> and <see cref="Source"/>), which can be fetched.
+/// </summary>
+public sealed record EpisodeEntry(MediaFile? File, LibraryDownload? Download = null, DownloadFile? Source = null)
+{
+    public string Key => File is not null ? $"file:{File.Id}" : $"{Download!.Id:N}:{Source!.Index}";
+
+    public int? Season => File is not null ? File.Season : Source!.Season;
+
+    public int? Episode => File is not null ? File.Episode : Source!.Episode;
+}
+
+public partial class EpisodeViewModel(LibraryViewModel library, Guid itemId, EpisodeEntry entry)
+    : ObservableObject, IKeyed<string>
 {
     [ObservableProperty]
-    private MediaFile _file = file;
+    private EpisodeEntry _entry = entry;
 
     [ObservableProperty]
     private bool _isLastPlayed;
@@ -16,35 +29,63 @@ public partial class EpisodeViewModel(LibraryViewModel library, Guid itemId, Med
     [ObservableProperty]
     private bool _isConfirmingDelete;
 
-    public int Key => File.Id;
+    public string Key => Entry.Key;
 
-    public string Code => File.EpisodeCode ?? "—";
+    /// <summary>Null while the episode is not on the Pi.</summary>
+    public MediaFile? File => Entry.File;
 
-    public string Name => Path.GetFileNameWithoutExtension(File.Name);
+    public bool IsOnPi => File is not null;
 
-    public bool IsWatched => File.Watched;
+    public bool IsFetching => File is null && Entry.Source!.Wanted && Entry.Download!.Status != DownloadStatus.Ready;
 
-    public string DeleteQuestion => $"Delete {File.EpisodeCode ?? Name} from the Pi? It will not be downloaded again.";
+    public bool CanFetch => File is null && !Entry.Source!.Wanted;
+
+    public string Code => (File?.EpisodeCode ?? Entry.Source?.EpisodeCode) ?? "—";
+
+    public string Name => Path.GetFileNameWithoutExtension(File?.Name ?? Entry.Source!.Name);
+
+    public bool IsWatched => File?.Watched ?? false;
+
+    /// <summary>What an episode that is not on the Pi is waiting for.</summary>
+    public string? FetchStatus => File is not null
+        ? null
+        : IsFetching
+            ? Entry.Download!.Status == DownloadStatus.Paused ? "Paused" : "Downloading…"
+            : $"Not downloaded · {Format.Size(Entry.Source!.SizeBytes)}";
+
+    public string DeleteQuestion => $"Delete {Code} from the Pi? You can download it again later.";
 
     /// <summary>0–100; how far the episode has been watched.</summary>
-    public double WatchedPercent => File.Watched ? 100 : File.Duration > 0 ? File.Position / File.Duration * 100 : 0;
+    public double WatchedPercent => File is null ? 0 : File.Watched ? 100 : File.Duration > 0 ? File.Position / File.Duration * 100 : 0;
 
-    public string? Remaining => !File.Watched && File.Position > 0 && File.Duration > 0
+    public string? Remaining => File is { Watched: false, Position: > 0, Duration: > 0 }
         ? $"{Format.Duration(File.Duration - File.Position)} left"
         : null;
 
-    public void Update(MediaFile file, int? lastPlayedFileId)
+    public void Update(EpisodeEntry entry, int? lastPlayedFileId)
     {
-        File = file;
-        IsLastPlayed = file.Id == lastPlayedFileId;
+        Entry = entry;
+        IsLastPlayed = entry.File is not null && entry.File.Id == lastPlayedFileId;
         OnPropertyChanged(string.Empty);
     }
 
     [RelayCommand]
-    private Task PlayAsync() => library.PlayAsync(itemId, new PlayItemRequest(File.Id));
+    private Task PlayAsync() => File is null ? Task.CompletedTask : library.PlayAsync(itemId, new PlayItemRequest(File.Id));
 
     [RelayCommand]
-    private Task PlayFromStartAsync() => library.PlayAsync(itemId, new PlayItemRequest(File.Id, FromStart: true));
+    private Task PlayFromStartAsync() =>
+        File is null ? Task.CompletedTask : library.PlayAsync(itemId, new PlayItemRequest(File.Id, FromStart: true));
+
+    /// <summary>Adds the episode to what its torrent fetches; the episodes already chosen stay chosen.</summary>
+    [RelayCommand]
+    private Task FetchAsync()
+    {
+        if (Entry is not { File: null, Download: { Files: { } files } download, Source: { } source })
+            return Task.CompletedTask;
+
+        var wanted = files.Where(file => file.Wanted).Select(file => file.Index).Append(source.Index).ToList();
+        return library.SelectDownloadFilesAsync(itemId, download.Id, wanted);
+    }
 
     [RelayCommand]
     private void AskDelete() => IsConfirmingDelete = true;
@@ -56,6 +97,6 @@ public partial class EpisodeViewModel(LibraryViewModel library, Guid itemId, Med
     private Task ConfirmDeleteAsync()
     {
         IsConfirmingDelete = false;
-        return library.DeleteFileAsync(itemId, File.Id);
+        return File is null ? Task.CompletedTask : library.DeleteFileAsync(itemId, File.Id);
     }
 }

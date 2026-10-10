@@ -15,7 +15,7 @@ public partial class DownloadViewModel : ObservableObject, IKeyed<Guid>
 
     /// <summary>Set by the item: episodes can be picked only for series.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanChooseEpisodes))]
+    [NotifyPropertyChangedFor(nameof(CanChooseEpisodes), nameof(StatusText))]
     private bool _isSeries;
 
     [ObservableProperty]
@@ -84,9 +84,25 @@ public partial class DownloadViewModel : ObservableObject, IKeyed<Guid>
             Download.EtaSeconds is { } eta ? Format.Eta(eta) : null,
         }.Where(part => part is not null)),
         DownloadStatus.Paused => string.Join(" · ", new[] { "Paused", $"{Percent:0}%", Downloaded }.Where(part => part is not null)),
-        DownloadStatus.Ready => Download.SizeBytes > 0 ? $"Downloaded · {Format.Size(Download.SizeBytes)}" : "Downloaded",
+        DownloadStatus.Ready => ReadyText,
         _ => Download.Error ?? "Failed",
     };
+
+    /// <summary>A season tells how many of its episodes are on the Pi; the rest can be fetched from the episode list.</summary>
+    private string ReadyText
+    {
+        get
+        {
+            var size = Download.SizeBytes > 0 ? Format.Size(Download.SizeBytes) : null;
+            if (!IsSeries || Episodes.Count <= 1)
+                return size is null ? "Downloaded" : $"Downloaded · {size}";
+
+            var onPi = Episodes.Count(episode => episode.IsWanted);
+            return onPi == 0
+                ? $"No episodes on the Pi · {Episodes.Count} available"
+                : string.Join(" · ", new[] { $"{onPi} of {Episodes.Count} episodes on the Pi", size }.Where(part => part is not null));
+        }
+    }
 
     /// <summary>"3.2 / 9.4 GB"; null until the torrent size is known.</summary>
     private string? Downloaded => Download.SizeBytes > 0

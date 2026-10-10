@@ -527,12 +527,100 @@ public sealed class LibraryServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task ChoosingFilesOfAFinishedDownloadIsRefused()
+    public async Task ChoosingFilesBeforeTheFileListIsKnownIsRefused()
     {
-        var series = await AddReadySeasonAsync();
+        var series = await _library.AddAsync(Series(season: 1), Token);
 
         await Assert.ThrowsAsync<LibraryStateException>(
             () => _library.SelectFilesAsync(series.Id, series.Downloads[0].Id, new SelectFilesRequest([0]), Token));
+    }
+
+    [Fact]
+    public async Task MoreEpisodesOfAFinishedSeasonAreFetchedIntoTheSameDownload()
+    {
+        var series = await AddFinishedSeasonWithFirstEpisodeAsync();
+        var download = series.Downloads[0];
+        var episode1 = series.Files.Single();
+
+        await _library.SelectFilesAsync(series.Id, download.Id, new SelectFilesRequest([0, 1]), Token);
+
+        var reopened = _library.List()[0].Downloads[0];
+        Assert.Equal(DownloadStatus.Queued, reopened.Status);
+        Assert.Equal(4 * Gb, reopened.SizeBytes);
+        Assert.Equal(["h1"], _qbit.Resumed);
+
+        _qbit.Update("h1", torrent => torrent with { State = "uploading", Progress = 1 });
+        await _library.SyncAsync(Token);
+
+        var after = _library.List()[0];
+        Assert.Equal(DownloadStatus.Ready, after.Downloads[0].Status);
+        Assert.Equal(["S01E01", "S01E02"], after.Files.Select(file => file.EpisodeCode));
+        Assert.Equal(episode1, after.Files[0]);
+    }
+
+    [Fact]
+    public async Task StaleFinishedProgressDoesNotEndAReopenedDownload()
+    {
+        var series = await AddFinishedSeasonWithFirstEpisodeAsync();
+        await _library.SelectFilesAsync(series.Id, series.Downloads[0].Id, new SelectFilesRequest([0, 1]), Token);
+        _qbit.Files["h1"][1] = _qbit.Files["h1"][1] with { Progress = 0.01 };
+
+        await _library.SyncAsync(Token);
+
+        var after = _library.List()[0];
+        Assert.NotEqual(DownloadStatus.Ready, after.Downloads[0].Status);
+        Assert.Equal(["S01E01"], after.Files.Select(file => file.EpisodeCode));
+    }
+
+    [Fact]
+    public async Task DeletingTheLastChosenEpisodeKeepsTheSeasonForMore()
+    {
+        var series = await AddFinishedSeasonWithFirstEpisodeAsync();
+
+        await _library.DeleteFileAsync(series.Id, series.Files[0].Id, Token);
+
+        var after = Assert.Single(_library.List());
+        Assert.Empty(after.Files);
+        Assert.Equal(DownloadStatus.Ready, after.Downloads[0].Status);
+        Assert.Equal([false, false, false, false], after.Downloads[0].Files!.Select(file => file.Wanted));
+        Assert.Empty(_qbit.Deleted);
+    }
+
+    [Fact]
+    public async Task SkippedEpisodesLeaveNoPartialFilesOrEmptyFolders()
+    {
+        var series = await AddRunningSeasonAsync();
+        var download = series.Downloads[0];
+        await _library.SelectFilesAsync(series.Id, download.Id, new SelectFilesRequest([0, 2]), Token);
+        var directory = _store.GetDownloadDirectory(series.Id, download.Id);
+        // qBittorrent writes the pieces shared with neighbours into skipped files.
+        var partial = Path.Combine(directory, "Shogun.S01/Shogun.S01E02.mkv");
+        var sample = Path.Combine(directory, "Shogun.S01/Sample/Shogun.S01E01.mkv");
+        Directory.CreateDirectory(Path.GetDirectoryName(sample)!);
+        await File.WriteAllTextAsync(partial, "boundary piece", Token);
+        await File.WriteAllTextAsync(sample, "boundary piece", Token);
+
+        _qbit.Update("h1", torrent => torrent with { State = "uploading", Progress = 1 });
+        await _library.SyncAsync(Token);
+
+        Assert.False(File.Exists(partial));
+        Assert.False(Directory.Exists(Path.GetDirectoryName(sample)));
+    }
+
+    [Fact]
+    public async Task SkippedFilesOfFinishedDownloadsAreRemovedOnLoad()
+    {
+        var series = await AddRunningSeasonAsync();
+        await _library.SelectFilesAsync(series.Id, series.Downloads[0].Id, new SelectFilesRequest([0]), Token);
+        _qbit.Update("h1", torrent => torrent with { State = "uploading", Progress = 1 });
+        await _library.SyncAsync(Token);
+        var partial = Path.Combine(_store.GetDownloadDirectory(series.Id, series.Downloads[0].Id), "Shogun.S01/Shogun.S01E03.mkv");
+        Directory.CreateDirectory(Path.GetDirectoryName(partial)!);
+        await File.WriteAllTextAsync(partial, "boundary piece", Token);
+
+        await CreateService().LoadAsync(Token);
+
+        Assert.False(File.Exists(partial));
     }
 
     [Fact]
@@ -567,12 +655,15 @@ public sealed class LibraryServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task DeletingTheLastEpisodeTakesTheDownloadWithIt()
+    public async Task DeletingTheOnlyEpisodeOfATorrentTakesTheDownloadWithIt()
     {
-        var series = await AddReadySeasonAsync();
+        await _library.AddAsync(Series(season: 1, episode: 1), Token);
+        _qbit.Appear("h1", progress: 1, state: "uploading");
+        _qbit.Files["h1"] = [new QbitFile { Name = "S01E01.mkv", Size = 2 * Gb }];
+        await _library.SyncAsync(Token);
+        var series = _library.List().Single();
 
-        foreach (var file in series.Files)
-            await _library.DeleteFileAsync(series.Id, file.Id, Token);
+        await _library.DeleteFileAsync(series.Id, series.Files[0].Id, Token);
 
         Assert.Empty(_library.List());
         Assert.Equal([("h1", true)], _qbit.Deleted);
@@ -592,6 +683,17 @@ public sealed class LibraryServiceTests : IDisposable
         _qbit.Appear("h1", progress: 0.1);
         _qbit.Files["h1"] = SeasonFiles();
         await _library.SyncAsync(Token);
+        return _library.List().Single();
+    }
+
+    /// <summary>A season of three episodes of which only the first was chosen and fetched.</summary>
+    private async Task<LibraryItem> AddFinishedSeasonWithFirstEpisodeAsync()
+    {
+        var series = await AddRunningSeasonAsync();
+        await _library.SelectFilesAsync(series.Id, series.Downloads[0].Id, new SelectFilesRequest([0]), Token);
+        _qbit.Update("h1", torrent => torrent with { State = "uploading", Progress = 1 });
+        await _library.SyncAsync(Token);
+        _qbit.Update("h1", torrent => torrent with { State = "stoppedUP" });
         return _library.List().Single();
     }
 

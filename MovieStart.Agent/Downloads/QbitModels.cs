@@ -55,6 +55,10 @@ public sealed record QbitFile
     [JsonPropertyName("size")]
     public long Size { get; init; }
 
+    /// <summary>0–1.</summary>
+    [JsonPropertyName("progress")]
+    public double Progress { get; init; }
+
     /// <summary>0 means the file is skipped.</summary>
     [JsonPropertyName("priority")]
     public int Priority { get; init; } = QbitClient.NormalPriority;

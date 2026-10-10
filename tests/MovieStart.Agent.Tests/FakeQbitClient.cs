@@ -47,9 +47,16 @@ public sealed class FakeQbitClient : IQbitClient
         return Task.FromResult<IReadOnlyList<QbitTorrent>>(Torrents.ToList());
     }
 
-    /// <summary>Files are numbered by position, like qBittorrent does, so tests can leave the index out.</summary>
-    public Task<IReadOnlyList<QbitFile>> GetFilesAsync(string hash, CancellationToken cancellationToken) =>
-        Task.FromResult<IReadOnlyList<QbitFile>>(Indexed(hash));
+    /// <summary>
+    /// Files are numbered by position, like qBittorrent does, so tests can leave the index out.
+    /// Wanted files without their own progress follow the torrent's.
+    /// </summary>
+    public Task<IReadOnlyList<QbitFile>> GetFilesAsync(string hash, CancellationToken cancellationToken)
+    {
+        var progress = Torrents.FirstOrDefault(t => t.Hash == hash)?.Progress ?? 0;
+        return Task.FromResult<IReadOnlyList<QbitFile>>(
+            Indexed(hash).Select(file => file.IsWanted && file.Progress == 0 ? file with { Progress = progress } : file).ToList());
+    }
 
     public Task PauseAsync(string hash, CancellationToken cancellationToken)
     {

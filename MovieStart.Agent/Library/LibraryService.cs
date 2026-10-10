@@ -50,7 +50,13 @@ public sealed class LibraryService(
     {
         Directory.CreateDirectory(media.Value.Root);
         foreach (var item in await store.LoadAllAsync(cancellationToken))
+        {
             _items[item.Id] = item;
+            // Finished downloads from before skipped files were cleaned up may still carry them.
+            foreach (var download in item.Downloads.Where(d => d.Status == DownloadStatus.Ready && d.Files is not null))
+                RemoveSkippedFiles(item.Id, download.Id, download.Files!.Where(file => !file.Wanted).Select(file => file.Name));
+        }
+
         logger.LogInformation("Loaded {Count} library items from {Root}", _items.Count, media.Value.Root);
     }
 
@@ -149,7 +155,10 @@ public sealed class LibraryService(
         }
     }
 
-    /// <summary>Chooses the files of a running download; qBittorrent skips the rest.</summary>
+    /// <summary>
+    /// Chooses the files of a download; qBittorrent skips the rest. Choosing more files of a finished download
+    /// (the next episodes of a season) starts it again; the episodes already on the Pi stay.
+    /// </summary>
     public async Task SelectFilesAsync(Guid itemId, Guid downloadId, SelectFilesRequest request, CancellationToken cancellationToken)
     {
         await _gate.WaitAsync(cancellationToken);
@@ -157,8 +166,8 @@ public sealed class LibraryService(
         {
             var item = Get(itemId);
             var download = GetDownload(item, downloadId);
-            if (!IsActive(download) || download.Files is null || download.TorrentHash is not { } hash)
-                throw new LibraryStateException("Files can be chosen while the download runs and its file list is known.");
+            if (download.Status == DownloadStatus.Error || download.Files is null || download.TorrentHash is not { } hash)
+                throw new LibraryStateException("Files can be chosen once the download's file list is known.");
 
             var wanted = request.Wanted.ToHashSet();
             if (wanted.Any(index => download.Files.All(file => file.Index != index)))
@@ -176,6 +185,10 @@ public sealed class LibraryService(
 
             // What was already fetched of a dropped file is freed now, not when the whole download goes.
             // Pieces shared with neighbouring files live in qBittorrent's own .parts file, so those are safe.
+            var droppedNames = dropped.Select(file => MediaFileName(download, file.Name)).ToHashSet();
+            var droppedFiles = item.Files.Where(file => droppedNames.Contains(file.Name)).ToList();
+            if (droppedFiles.Any(file => IsPlaying(item, file)))
+                await StopPlayerAsync(cancellationToken);
             foreach (var file in dropped)
             {
                 var path = Path.Combine(directory, file.Name);
@@ -183,12 +196,32 @@ public sealed class LibraryService(
                     File.Delete(path);
             }
 
+            RemoveEmptyFolders(directory);
+
             // qBittorrent still counts the pieces of a deleted file as done; a recheck makes it fetch them again.
             if (restored.Any(file => !File.Exists(Path.Combine(directory, file.Name))))
                 await qbit.RecheckAsync(hash, cancellationToken);
 
-            download = download with { Files = download.Files.Select(file => file with { Wanted = wanted.Contains(file.Index) }).ToList() };
-            item = ReplaceDownload(item, download);
+            var files = download.Files.Select(file => file with { Wanted = wanted.Contains(file.Index) }).ToList();
+            download = download with { Files = files };
+            if (download.Status == DownloadStatus.Ready && restored.Count > 0)
+            {
+                // The torrent was stopped when it finished; sync takes it from here until the new files are in.
+                await qbit.ResumeAsync(hash, cancellationToken);
+                download = download with
+                {
+                    Status = DownloadStatus.Queued,
+                    Progress = 0,
+                    SizeBytes = files.Where(file => file.Wanted).Sum(file => file.SizeBytes),
+                };
+                logger.LogInformation("{Title}: fetching {Count} more file(s) of {Release}", item.Title, restored.Count, download.ReleaseTitle);
+            }
+
+            item = ReplaceDownload(item, download) with
+            {
+                Files = item.Files.Where(file => !droppedNames.Contains(file.Name)).ToList(),
+                LastPlayedFileId = droppedFiles.Any(file => file.Id == item.LastPlayedFileId) ? null : item.LastPlayedFileId,
+            };
             await store.SaveAsync(item, cancellationToken);
             _items[itemId] = item;
         }
@@ -199,8 +232,9 @@ public sealed class LibraryService(
     }
 
     /// <summary>
-    /// Deletes one downloaded file, e.g. a watched episode. qBittorrent is told to skip it, so it is not fetched again.
-    /// The last file of a download takes the download with it.
+    /// Deletes one downloaded file, e.g. a watched episode. qBittorrent is told to skip it, so it is not fetched again
+    /// until it is chosen again. The last file of a download takes the download with it, unless the torrent has
+    /// other episodes left to fetch.
     /// </summary>
     public async Task DeleteFileAsync(Guid itemId, int fileId, CancellationToken cancellationToken)
     {
@@ -211,7 +245,9 @@ public sealed class LibraryService(
             var file = item.Files.FirstOrDefault(f => f.Id == fileId)
                 ?? throw new LibraryNotFoundException($"File {fileId} is not in '{item.Title}'.");
             var download = GetDownload(item, file.DownloadId);
-            if (item.Files.Count(f => f.DownloadId == download.Id) == 1)
+            var torrentName = file.Name[(download.Id.ToString("N").Length + 1)..].Replace('\\', '/');
+            var hasOtherEpisodes = download.Files?.Any(f => f.IsVideo && f.Name != torrentName) ?? false;
+            if (item.Files.Count(f => f.DownloadId == download.Id) == 1 && !hasOtherEpisodes)
             {
                 await DeleteDownloadAsync(item, download, cancellationToken);
                 return;
@@ -220,8 +256,6 @@ public sealed class LibraryService(
             if (IsPlaying(item, file))
                 await StopPlayerAsync(cancellationToken);
 
-            // File names are "<download folder>/<path inside the torrent>".
-            var torrentName = file.Name[(download.Id.ToString("N").Length + 1)..].Replace('\\', '/');
             var hash = download.TorrentHash ?? FindTorrent(await qbit.GetTorrentsAsync(cancellationToken), download.Id)?.Hash;
             if (hash is not null)
             {
@@ -233,9 +267,15 @@ public sealed class LibraryService(
             var path = GetFilePath(item, file);
             if (File.Exists(path))
                 File.Delete(path);
+            RemoveEmptyFolders(store.GetDownloadDirectory(item.Id, download.Id));
             logger.LogInformation("{Title}: deleted {File}", item.Title, file.EpisodeCode ?? file.Name);
 
-            download = download with { Files = download.Files?.Select(f => f.Name == torrentName ? f with { Wanted = false } : f).ToList() };
+            var files = download.Files?.Select(f => f.Name == torrentName ? f with { Wanted = false } : f).ToList();
+            download = download with
+            {
+                Files = files,
+                SizeBytes = files?.Where(f => f.Wanted).Sum(f => f.SizeBytes) ?? download.SizeBytes,
+            };
             item = ReplaceDownload(item, download) with
             {
                 Files = item.Files.Where(f => f.Id != fileId).ToList(),
@@ -345,8 +385,16 @@ public sealed class LibraryService(
             if (completed)
             {
                 files = await qbit.GetFilesAsync(torrent!.Hash, cancellationToken);
-                // Downloads are not seeded from the Pi.
-                await qbit.PauseAsync(torrent.Hash, cancellationToken);
+                // Right after more episodes are chosen the torrent may still report the old, finished progress.
+                if (files.Any(file => file.IsWanted && file.Progress < 1))
+                {
+                    files = null;
+                }
+                else
+                {
+                    // Downloads are not seeded from the Pi.
+                    await qbit.PauseAsync(torrent.Hash, cancellationToken);
+                }
             }
 
             updates.Add((itemId, updated, files));
@@ -369,7 +417,15 @@ public sealed class LibraryService(
 
                     // A selection made meanwhile wins over the list read before it.
                     var merged = download with { Files = current.Files ?? download.Files };
-                    updated = files is null ? ReplaceDownload(updated, merged) : Complete(updated, merged, files);
+                    if (files is null)
+                    {
+                        updated = ReplaceDownload(updated, merged);
+                    }
+                    else
+                    {
+                        updated = Complete(updated, merged, files);
+                        RemoveSkippedFiles(updated.Id, merged.Id, files.Where(file => !file.IsWanted).Select(file => file.Name));
+                    }
                 }
 
                 if (PersistentStateChanged(item, updated))
@@ -483,15 +539,18 @@ public sealed class LibraryService(
         if (item.Kind == MediaKind.Movie)
             videos = [videos.MaxBy(file => file.Size)!];
 
+        // A download that fetched more episodes later already has the earlier ones in the library.
+        var known = item.Files.Select(file => file.Name).ToHashSet();
+        videos = videos.Where(file => !known.Contains(MediaFileName(download, file.Name))).ToList();
+
         var nextId = item.Files.Count == 0 ? 1 : item.Files.Max(file => file.Id) + 1;
-        var downloadFolder = download.Id.ToString("N");
         var added = videos.Select((file, index) =>
         {
             var (season, episode) = item.Kind == MediaKind.Series ? EpisodeParser.Parse(file.Name) : (null, null);
             return new MediaFile(
                 nextId + index,
                 download.Id,
-                Path.Combine(downloadFolder, file.Name),
+                MediaFileName(download, file.Name),
                 file.Size,
                 season ?? download.Season,
                 episode ?? (videos.Count == 1 ? download.Episode : null));
@@ -510,6 +569,40 @@ public sealed class LibraryService(
             Files = WatchOrder.Sort([.. item.Files, .. added]),
         };
     }
+
+    /// <summary>
+    /// qBittorrent writes the pieces a skipped file shares with its neighbours into that file, so skipped episodes
+    /// leave partial files behind. Once the torrent is stopped they are removed, along with folders left empty.
+    /// </summary>
+    private void RemoveSkippedFiles(Guid itemId, Guid downloadId, IEnumerable<string> skippedNames)
+    {
+        var directory = store.GetDownloadDirectory(itemId, downloadId);
+        foreach (var name in skippedNames)
+        {
+            var path = Path.Combine(directory, name);
+            if (File.Exists(path))
+                File.Delete(path);
+        }
+
+        RemoveEmptyFolders(directory);
+    }
+
+    /// <summary>Removes empty folders below <paramref name="directory"/>, keeping the directory itself.</summary>
+    private static void RemoveEmptyFolders(string directory)
+    {
+        if (!Directory.Exists(directory))
+            return;
+
+        foreach (var folder in Directory.EnumerateDirectories(directory, "*", SearchOption.AllDirectories).OrderByDescending(path => path.Length))
+        {
+            if (!Directory.EnumerateFileSystemEntries(folder).Any())
+                Directory.Delete(folder);
+        }
+    }
+
+    /// <summary>Library file names are "&lt;download folder&gt;/&lt;path inside the torrent&gt;".</summary>
+    private static string MediaFileName(LibraryDownload download, string torrentName) =>
+        Path.Combine(download.Id.ToString("N"), torrentName);
 
     private static LibraryItem ReplaceDownload(LibraryItem item, LibraryDownload download) =>
         item with { Downloads = item.Downloads.Select(d => d.Id == download.Id ? download : d).ToList() };
