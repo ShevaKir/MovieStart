@@ -481,11 +481,33 @@ public sealed class LibraryServiceTests : IDisposable
         await _library.SelectFilesAsync(series.Id, download.Id, new SelectFilesRequest([0, 2]), Token);
 
         Assert.False(File.Exists(episode2));
-        Assert.Empty(_qbit.Rechecked);
+        Assert.Equal(["h1"], _qbit.Rechecked);
+    }
+
+    [Fact]
+    public async Task EpisodeDeletedWithoutARecheckIsRecheckedWhenChosenAgain()
+    {
+        var series = await AddRunningSeasonAsync();
+        var download = series.Downloads[0];
+        await _library.SelectFilesAsync(series.Id, download.Id, new SelectFilesRequest([0, 2]), Token);
+        // Deleted by an older agent: gone from disk while qBittorrent counts part of it as done.
+        _qbit.Files["h1"][1] = _qbit.Files["h1"][1] with { Progress = 0.2 };
 
         await _library.SelectFilesAsync(series.Id, download.Id, new SelectFilesRequest([0, 1, 2]), Token);
 
         Assert.Equal(["h1"], _qbit.Rechecked);
+    }
+
+    [Fact]
+    public async Task EpisodeNeverFetchedIsChosenWithoutARecheck()
+    {
+        var series = await AddRunningSeasonAsync();
+        var download = series.Downloads[0];
+        await _library.SelectFilesAsync(series.Id, download.Id, new SelectFilesRequest([0, 2]), Token);
+
+        await _library.SelectFilesAsync(series.Id, download.Id, new SelectFilesRequest([0, 1, 2]), Token);
+
+        Assert.Empty(_qbit.Rechecked);
     }
 
     [Fact]
@@ -570,6 +592,47 @@ public sealed class LibraryServiceTests : IDisposable
         var after = _library.List()[0];
         Assert.NotEqual(DownloadStatus.Ready, after.Downloads[0].Status);
         Assert.Equal(["S01E01"], after.Files.Select(file => file.EpisodeCode));
+    }
+
+    [Fact]
+    public async Task DeletedEpisodeChosenAgainWaitsForTheRecheck()
+    {
+        var series = await AddFinishedSeasonWithFirstEpisodeAsync();
+        var episode = series.Files.Single();
+        Directory.CreateDirectory(Path.GetDirectoryName(PathOf(series, episode))!);
+        await File.WriteAllTextAsync(PathOf(series, episode), "video", Token);
+        await _library.DeleteFileAsync(series.Id, episode.Id, Token);
+        Assert.Equal(["h1"], _qbit.Rechecked);
+
+        await _library.SelectFilesAsync(series.Id, series.Downloads[0].Id, new SelectFilesRequest([0]), Token);
+        // Before the check starts qBittorrent still counts the deleted episode as done.
+        _qbit.Files["h1"][0] = _qbit.Files["h1"][0] with { Progress = 1 };
+        await _library.SyncAsync(Token);
+        Assert.Empty(_library.List()[0].Files);
+
+        _qbit.Update("h1", torrent => torrent with { State = "checkingUP", Progress = 0.3 });
+        await _library.SyncAsync(Token);
+        _qbit.Update("h1", torrent => torrent with { State = "uploading", Progress = 1 });
+        await _library.SyncAsync(Token);
+
+        Assert.Equal(["S01E01"], _library.List()[0].Files.Select(file => file.EpisodeCode));
+    }
+
+    [Fact]
+    public async Task RecheckThatIsNeverSeenStopsBlockingAfterAWhile()
+    {
+        var series = await AddFinishedSeasonWithFirstEpisodeAsync();
+        var episode = series.Files.Single();
+        Directory.CreateDirectory(Path.GetDirectoryName(PathOf(series, episode))!);
+        await File.WriteAllTextAsync(PathOf(series, episode), "video", Token);
+        await _library.DeleteFileAsync(series.Id, episode.Id, Token);
+        await _library.SelectFilesAsync(series.Id, series.Downloads[0].Id, new SelectFilesRequest([0]), Token);
+        _qbit.Update("h1", torrent => torrent with { State = "uploading", Progress = 1 });
+
+        _time.Advance(TimeSpan.FromMinutes(3));
+        await _library.SyncAsync(Token);
+
+        Assert.Equal(["S01E01"], _library.List()[0].Files.Select(file => file.EpisodeCode));
     }
 
     [Fact]

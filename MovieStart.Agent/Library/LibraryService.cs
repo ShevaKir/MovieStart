@@ -46,15 +46,39 @@ public sealed class LibraryService(
     // Serializes read-modify-write of items between requests, the download sync and the watch tracker.
     private readonly SemaphoreSlim _gate = new(1, 1);
 
+    /// <summary>
+    /// Downloads whose data was deleted behind qBittorrent's back and that are rechecked. Until the check is seen
+    /// running (or a while has passed), qBittorrent's progress still counts the deleted pieces as done.
+    /// </summary>
+    private readonly ConcurrentDictionary<Guid, DateTimeOffset> _rechecks = new();
+
+    private static readonly TimeSpan RecheckGracePeriod = TimeSpan.FromMinutes(2);
+
     public async Task LoadAsync(CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(media.Value.Root);
+        var cleaned = new List<LibraryDownload>();
         foreach (var item in await store.LoadAllAsync(cancellationToken))
         {
             _items[item.Id] = item;
             // Finished downloads from before skipped files were cleaned up may still carry them.
             foreach (var download in item.Downloads.Where(d => d.Status == DownloadStatus.Ready && d.Files is not null))
-                RemoveSkippedFiles(item.Id, download.Id, download.Files!.Where(file => !file.Wanted).Select(file => file.Name));
+            {
+                if (RemoveSkippedFiles(item.Id, download.Id, download.Files!.Where(file => !file.Wanted).Select(file => file.Name)))
+                    cleaned.Add(download);
+            }
+        }
+
+        foreach (var download in cleaned.Where(d => d.TorrentHash is not null))
+        {
+            try
+            {
+                await RecheckAsync(download.Id, download.TorrentHash!, cancellationToken);
+            }
+            catch (QbitUnavailableException ex)
+            {
+                logger.LogWarning(ex, "Could not recheck {Release} after removing skipped files", download.ReleaseTitle);
+            }
         }
 
         logger.LogInformation("Loaded {Count} library items from {Root}", _items.Count, media.Value.Root);
@@ -179,6 +203,10 @@ public sealed class LibraryService(
             var restored = download.Files.Where(file => !file.Wanted && wanted.Contains(file.Index)).ToList();
             var directory = store.GetDownloadDirectory(itemId, downloadId);
 
+            // What qBittorrent counts as done of the files chosen again, read before they are chosen.
+            var gone = restored.Where(file => !File.Exists(Path.Combine(directory, file.Name))).Select(file => file.Index).ToHashSet();
+            var before = gone.Count > 0 ? await qbit.GetFilesAsync(hash, cancellationToken) : [];
+
             await qbit.SetFilePriorityAsync(hash, [.. wanted], QbitClient.NormalPriority, cancellationToken);
             await qbit.SetFilePriorityAsync(
                 hash, [.. download.Files.Where(file => !wanted.Contains(file.Index)).Select(file => file.Index)], QbitClient.SkipPriority, cancellationToken);
@@ -189,18 +217,13 @@ public sealed class LibraryService(
             var droppedFiles = item.Files.Where(file => droppedNames.Contains(file.Name)).ToList();
             if (droppedFiles.Any(file => IsPlaying(item, file)))
                 await StopPlayerAsync(cancellationToken);
-            foreach (var file in dropped)
-            {
-                var path = Path.Combine(directory, file.Name);
-                if (File.Exists(path))
-                    File.Delete(path);
-            }
-
-            RemoveEmptyFolders(directory);
+            var deleted = RemoveSkippedFiles(itemId, downloadId, dropped.Select(file => file.Name));
 
             // qBittorrent still counts the pieces of a deleted file as done; a recheck makes it fetch them again.
-            if (restored.Any(file => !File.Exists(Path.Combine(directory, file.Name))))
-                await qbit.RecheckAsync(hash, cancellationToken);
+            // That also covers a file deleted before rechecks were made: gone from disk, yet partly done.
+            var counted = gone.Count > 0 && before.Any(file => gone.Contains(file.Index) && file.Progress > 0);
+            if (deleted || counted)
+                await RecheckAsync(downloadId, hash, cancellationToken);
 
             var files = download.Files.Select(file => file with { Wanted = wanted.Contains(file.Index) }).ToList();
             download = download with { Files = files };
@@ -264,10 +287,8 @@ public sealed class LibraryService(
                     await qbit.SetFilePriorityAsync(hash, [torrentFile.Index], QbitClient.SkipPriority, cancellationToken);
             }
 
-            var path = GetFilePath(item, file);
-            if (File.Exists(path))
-                File.Delete(path);
-            RemoveEmptyFolders(store.GetDownloadDirectory(item.Id, download.Id));
+            if (RemoveSkippedFiles(item.Id, download.Id, [torrentName]) && hash is not null)
+                await RecheckAsync(download.Id, hash, cancellationToken);
             logger.LogInformation("{Title}: deleted {File}", item.Title, file.EpisodeCode ?? file.Name);
 
             var files = download.Files?.Select(f => f.Name == torrentName ? f with { Wanted = false } : f).ToList();
@@ -382,6 +403,8 @@ public sealed class LibraryService(
             if (updated.Files is null && torrent is not null && updated.Status != DownloadStatus.Queued)
                 updated = updated with { Files = await ReadFilesAsync(kind, updated.Season, torrent.Hash, cancellationToken) };
             IReadOnlyList<QbitFile>? files = null;
+            if (completed && _rechecks.TryGetValue(download.Id, out var requestedAt) && time.GetUtcNow() - requestedAt < RecheckGracePeriod)
+                completed = false;
             if (completed)
             {
                 files = await qbit.GetFilesAsync(torrent!.Hash, cancellationToken);
@@ -400,6 +423,7 @@ public sealed class LibraryService(
             updates.Add((itemId, updated, files));
         }
 
+        var cleaned = new List<(Guid DownloadId, string Hash)>();
         await _gate.WaitAsync(cancellationToken);
         try
         {
@@ -424,7 +448,8 @@ public sealed class LibraryService(
                     else
                     {
                         updated = Complete(updated, merged, files);
-                        RemoveSkippedFiles(updated.Id, merged.Id, files.Where(file => !file.IsWanted).Select(file => file.Name));
+                        if (RemoveSkippedFiles(updated.Id, merged.Id, files.Where(file => !file.IsWanted).Select(file => file.Name)))
+                            cleaned.Add((merged.Id, merged.TorrentHash!));
                     }
                 }
 
@@ -437,6 +462,9 @@ public sealed class LibraryService(
         {
             _gate.Release();
         }
+
+        foreach (var (downloadId, hash) in cleaned)
+            await RecheckAsync(downloadId, hash, cancellationToken);
     }
 
     /// <summary>Reads audio and subtitle tracks of downloaded files that have not been probed yet.</summary>
@@ -511,7 +539,11 @@ public sealed class LibraryService(
 
         // While qBittorrent re-hashes the data, "progress" is how far the check got, not the download.
         if (torrent.State.StartsWith("checking", StringComparison.Ordinal))
+        {
+            // From now on the progress qBittorrent reports comes from the check.
+            _rechecks.TryRemove(download.Id, out _);
             return (download with { TorrentHash = torrent.Hash, DownloadSpeed = 0, EtaSeconds = null }, false);
+        }
 
         var updated = download with
         {
@@ -574,17 +606,33 @@ public sealed class LibraryService(
     /// qBittorrent writes the pieces a skipped file shares with its neighbours into that file, so skipped episodes
     /// leave partial files behind. Once the torrent is stopped they are removed, along with folders left empty.
     /// </summary>
-    private void RemoveSkippedFiles(Guid itemId, Guid downloadId, IEnumerable<string> skippedNames)
+    /// <returns>True when a file was deleted, so qBittorrent has to recheck the torrent.</returns>
+    private bool RemoveSkippedFiles(Guid itemId, Guid downloadId, IEnumerable<string> skippedNames)
     {
         var directory = store.GetDownloadDirectory(itemId, downloadId);
+        var deleted = false;
         foreach (var name in skippedNames)
         {
             var path = Path.Combine(directory, name);
             if (File.Exists(path))
+            {
                 File.Delete(path);
+                deleted = true;
+            }
         }
 
         RemoveEmptyFolders(directory);
+        return deleted;
+    }
+
+    /// <summary>
+    /// Makes qBittorrent forget pieces whose data was deleted. Pieces a deleted file shared with a kept neighbour
+    /// still count as done otherwise, and choosing that file again would leave holes in it.
+    /// </summary>
+    private async Task RecheckAsync(Guid downloadId, string hash, CancellationToken cancellationToken)
+    {
+        _rechecks[downloadId] = time.GetUtcNow();
+        await qbit.RecheckAsync(hash, cancellationToken);
     }
 
     /// <summary>Removes empty folders below <paramref name="directory"/>, keeping the directory itself.</summary>
