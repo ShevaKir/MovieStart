@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Publishes the agent and installs it on the Pi with its systemd units.
+# Publishes the agent and installs it on the Pi with its systemd units; restarts the agent and mpv.
 set -euo pipefail
 
 host="${MOVIESTART_PI:-sheva-server}"
@@ -19,6 +19,8 @@ ssh "$host" '
   sudo systemctl enable moviestart-agent
   sudo systemctl restart moviestart-agent
   systemctl --user daemon-reload
-  systemctl --user enable --now mpv
+  systemctl --user enable mpv
+  # A fresh mpv: its IPC server has been seen to stop accepting connections after days of running.
+  systemctl --user restart mpv
 '
 echo "Deployed. Health: curl http://$host.local:5080/api/health"

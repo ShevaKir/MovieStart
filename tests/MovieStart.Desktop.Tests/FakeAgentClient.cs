@@ -1,4 +1,4 @@
-using MovieStart.Desktop.Services;
+using MovieStart.Client;
 using MovieStart.Shared.Health;
 using MovieStart.Shared.Library;
 using MovieStart.Shared.Player;

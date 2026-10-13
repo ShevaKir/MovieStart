@@ -1,10 +1,14 @@
 <Solution>
   <Project Path="MovieStart.Agent/MovieStart.Agent.csproj" />
+  <Project Path="MovieStart.Client/MovieStart.Client.csproj" />
   <Project Path="MovieStart.Desktop/MovieStart.Desktop.csproj" />
   <Project Path="MovieStart.Shared/MovieStart.Shared.csproj" />
   <Folder Name="/tests/">
     <Project Path="tests/MovieStart.Agent.Tests/MovieStart.Agent.Tests.csproj" />
+    <Project Path="tests/MovieStart.Client.Tests/MovieStart.Client.Tests.csproj" />
     <Project Path="tests/MovieStart.Desktop.Tests/MovieStart.Desktop.Tests.csproj" />
     <Project Path="tests/MovieStart.Shared.Tests/MovieStart.Shared.Tests.csproj" />
+    <Project Path="tests/MovieStart.Web.Tests/MovieStart.Web.Tests.csproj" />
   </Folder>
+  <Project Path="MovieStart.Web/MovieStart.Web.csproj" />
 </Solution>

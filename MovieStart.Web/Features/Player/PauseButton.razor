@@ -1,0 +1,10 @@
+@inject PlayerStore Player
+
+<button class="play" aria-label="@(State.IsPaused ? "Play" : "Pause")" @onclick="Player.TogglePauseAsync">
+    <Icon Path="@(State.IsPaused ? Icons.Play : Icons.Pause)" />
+</button>
+
+@code {
+    [Parameter, EditorRequired]
+    public PlayerState State { get; set; } = null!;
+}

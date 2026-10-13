@@ -7,7 +7,7 @@ using MovieStart.Shared.Player;
 using MovieStart.Shared.Profile;
 using MovieStart.Shared.Search;
 
-namespace MovieStart.Desktop.Services;
+namespace MovieStart.Client;
 
 public record AgentResult(bool IsSuccess, string? Error)
 {

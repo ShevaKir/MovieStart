@@ -1,0 +1,15 @@
+.poster {
+    flex: none;
+    display: grid;
+    place-items: center;
+    overflow: hidden;
+    border-radius: 8px;
+    background: #2D4A6B;
+    color: white;
+    font-weight: 600;
+}
+
+.poster.small { width: 56px; height: 84px; font-size: 15px; }
+.poster.large { width: 112px; height: 168px; font-size: 22px; border-radius: 10px; }
+
+img { width: 100%; height: 100%; object-fit: cover; }

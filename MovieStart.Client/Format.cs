@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace MovieStart.Desktop.ViewModels;
+namespace MovieStart.Client;
 
 public static class Format
 {

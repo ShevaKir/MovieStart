@@ -7,6 +7,10 @@ public sealed class FakePlayer : IPlayer
 {
     public PlayerState State { get; set; } = PlayerState.Disconnected;
 
+    public event Action<string>? PlaybackFinished;
+
+    public void Finish(string path) => PlaybackFinished?.Invoke(path);
+
     public string? PlayedPath { get; private set; }
 
     public PlaybackOptions? PlayedOptions { get; private set; }

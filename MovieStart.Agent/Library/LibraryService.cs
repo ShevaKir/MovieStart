@@ -366,6 +366,32 @@ public sealed class LibraryService(
         }
     }
 
+    /// <summary>
+    /// Starts the next episode of the same season once <paramref name="finishedPath"/> has played to its end,
+    /// if that episode is downloaded. A gap in the episodes stops the run.
+    /// </summary>
+    /// <returns>The file that was started, or null when there is nothing to continue with.</returns>
+    public async Task<MediaFile?> PlayNextEpisodeAsync(string finishedPath, CancellationToken cancellationToken)
+    {
+        if (TryFindFile(finishedPath) is not var (itemId, fileId))
+            return null;
+
+        // The viewer may have started something else in the meantime.
+        if (player.State.FilePath is { } current && current != finishedPath)
+            return null;
+
+        var files = Get(itemId).Files;
+        var index = files.ToList().FindIndex(f => f.Id == fileId);
+        if (index < 0 || index + 1 >= files.Count)
+            return null;
+
+        var (finished, next) = (files[index], files[index + 1]);
+        if (finished is not { Season: { } season, Episode: { } episode } || next.Season != season || next.Episode != episode + 1)
+            return null;
+
+        return await PlayAsync(itemId, new PlayItemRequest(next.Id), cancellationToken);
+    }
+
     /// <summary>Remembers how far the file at <paramref name="path"/> has been watched.</summary>
     public async Task RecordProgressAsync(string path, double position, double duration, CancellationToken cancellationToken)
     {

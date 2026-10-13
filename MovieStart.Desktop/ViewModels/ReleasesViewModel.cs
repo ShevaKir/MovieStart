@@ -1,6 +1,6 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
-using MovieStart.Desktop.Services;
+using MovieStart.Client;
 using MovieStart.Shared.Library;
 using MovieStart.Shared.Search;
 

@@ -1,0 +1,59 @@
+@inject LibraryStore Library
+
+<div class="row @(IsOnTv ? "on-tv" : null)">
+    <div class="line">
+        <span class="code @(File.Watched ? "watched" : null)">@(File.EpisodeCode ?? "—")</span>
+        <div class="text">
+            <span class="name">@System.IO.Path.GetFileNameWithoutExtension(File.Name)</span>
+            <div class="progress"><span style="width: @(WatchedPercent.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%"></span></div>
+            <span class="meta">@Meta</span>
+        </div>
+        <div class="tools">
+            <button class="mini" title="Play" aria-label="Play" @onclick="() => Library.PlayAsync(ItemId, new PlayItemRequest(File.Id))">
+                <Icon Path="@Icons.Play" />
+            </button>
+            <button class="mini" title="Play from the start" aria-label="Play from the start"
+                    @onclick="() => Library.PlayAsync(ItemId, new PlayItemRequest(File.Id, FromStart: true))">
+                <Icon Path="@Icons.FromStart" />
+            </button>
+            <button class="mini" title="Delete this episode" aria-label="Delete this episode" @onclick="() => _confirming = true">
+                <Icon Path="@Icons.Delete" />
+            </button>
+        </div>
+    </div>
+    @if (_confirming)
+    {
+        <DeleteConfirmation OnCancel="() => _confirming = false" OnConfirm="DeleteAsync">
+            Delete @(File.EpisodeCode ?? "this file") from the Pi? You can download it again later.
+        </DeleteConfirmation>
+    }
+</div>
+
+@code {
+    private bool _confirming;
+
+    [Parameter, EditorRequired]
+    public Guid ItemId { get; set; }
+
+    [Parameter, EditorRequired]
+    public MediaFile File { get; set; } = null!;
+
+    [Parameter]
+    public bool IsOnTv { get; set; }
+
+    private double WatchedPercent => File.Watched ? 100 : File.Duration > 0 ? File.Position / File.Duration * 100 : 0;
+
+    private string Meta => IsOnTv ? "On TV" : File switch
+    {
+        { Watched: true } => "Watched",
+        { Position: > 0, Duration: > 0 } => $"{Format.Duration(File.Duration - File.Position)} left",
+        { Duration: > 0 } => Format.Duration(File.Duration),
+        _ => Format.Size(File.SizeBytes),
+    };
+
+    private async Task DeleteAsync()
+    {
+        _confirming = false;
+        await Library.DeleteFileAsync(ItemId, File.Id);
+    }
+}

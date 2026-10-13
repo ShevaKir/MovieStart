@@ -1,0 +1,10 @@
+<svg viewBox="0 0 24 24" class="@Class" aria-hidden="true"><path d="@Path" /></svg>
+
+@code {
+    /// <summary>One of <see cref="Icons"/>.</summary>
+    [Parameter, EditorRequired]
+    public string Path { get; set; } = "";
+
+    [Parameter]
+    public string? Class { get; set; }
+}

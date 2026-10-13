@@ -17,6 +17,7 @@ MovieStart — a Mac app (Avalonia, .NET 10) plus an agent on a Raspberry Pi 5 (
 - Don't hardcode the agent address: default `http://sheva-server.local:5080`, configured via `appsettings.json`.
 - The player sits behind an `IPlayer` interface (mpv now, Kodi possible later).
 - DTOs and API contracts live only in `MovieStart.Shared`.
+- The agent HTTP client and UI wording both apps share live in `MovieStart.Client`; the web app (`MovieStart.Web`, Blazor WASM served by the agent) should grow towards the desktop's features through it.
 - Config: committed `appsettings.json`; personal local overrides in `appsettings.Local.json` (gitignored, template in `appsettings.Local.example.json`); env vars win on deploy (Desktop uses the `MOVIESTART_` prefix).
 - Every project has its own test project under `tests/` (xUnit v3 on Microsoft.Testing.Platform). Run `dotnet test --solution MovieStart.slnx`.
 

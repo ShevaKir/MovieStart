@@ -72,134 +72,136 @@
           <TextBlock Text="Search results" />
         </StackPanel>
       </Button>
-      <DockPanel DataContext="{Binding Selected}" x:DataType="vm:ReleasesViewModel">
-        <StackPanel DockPanel.Dock="Top" Spacing="16" Margin="0,0,0,16">
-          <Grid ColumnDefinitions="Auto,*" ColumnSpacing="20">
-            <Border Width="100" Height="150" CornerRadius="10" Background="#2D4A6B" ClipToBounds="True">
-              <Panel>
-                <TextBlock Text="{Binding Title.Initials}" Foreground="White" FontSize="18" FontWeight="SemiBold"
-                           HorizontalAlignment="Center" VerticalAlignment="Center" />
-                <Image Source="{Binding Title.Poster}" Stretch="UniformToFill" />
-              </Panel>
-            </Border>
-            <StackPanel Grid.Column="1" Spacing="6">
-              <TextBlock Text="{Binding Title.Name}" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
-              <TextBlock Text="{Binding Title.Details}" Classes="muted" />
-              <TextBlock Text="{Binding Title.Title.Overview}" TextWrapping="Wrap" MaxWidth="720" HorizontalAlignment="Left"
-                         MaxLines="4" TextTrimming="WordEllipsis" Foreground="#45433F" />
-            </StackPanel>
-          </Grid>
-
-          <Border Classes="card">
-            <Grid ColumnDefinitions="96,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="10">
-              <TextBlock Grid.Row="0" Text="Language" Classes="muted" FontSize="12" VerticalAlignment="Center" />
-              <ItemsControl Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Languages}">
-                <ItemsControl.ItemsPanel>
-                  <ItemsPanelTemplate><WrapPanel ItemSpacing="8" LineSpacing="8" /></ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:FilterChip">
-                    <ToggleButton Classes="chip" Content="{Binding Label}" IsChecked="{Binding IsSelected}" FontWeight="SemiBold" />
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-
-              <TextBlock Grid.Row="1" Text="Voice-over" Classes="muted" FontSize="12" VerticalAlignment="Center" />
-              <ItemsControl Grid.Row="1" Grid.Column="1" ItemsSource="{Binding Voices}">
-                <ItemsControl.ItemsPanel>
-                  <ItemsPanelTemplate><WrapPanel ItemSpacing="8" LineSpacing="8" /></ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:FilterChip">
-                    <ToggleButton Classes="chip" Content="{Binding Label}" IsChecked="{Binding IsSelected}" />
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-
-              <TextBlock Grid.Row="2" Text="Season" Classes="muted" FontSize="12" VerticalAlignment="Center" IsVisible="{Binding HasSeasons}" />
-              <ItemsControl Grid.Row="2" Grid.Column="1" ItemsSource="{Binding Seasons}" IsVisible="{Binding HasSeasons}">
-                <ItemsControl.ItemsPanel>
-                  <ItemsPanelTemplate><WrapPanel ItemSpacing="8" LineSpacing="8" /></ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                  <DataTemplate x:DataType="vm:FilterChip">
-                    <ToggleButton Classes="chip" Content="{Binding Label}" IsChecked="{Binding IsSelected}" />
-                  </DataTemplate>
-                </ItemsControl.ItemTemplate>
-              </ItemsControl>
-
-              <TextBlock Grid.Row="3" Grid.ColumnSpan="2" Classes="muted" FontSize="12" TextWrapping="Wrap"
-                         Text="1080p only, cam rips hidden. Your voice-over profile first, then source, MKV, x265, seeders." />
+      <Panel DataContext="{Binding Selected}">
+        <DockPanel x:DataType="vm:ReleasesViewModel">
+          <StackPanel DockPanel.Dock="Top" Spacing="16" Margin="0,0,0,16">
+            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="20">
+              <Border Width="100" Height="150" CornerRadius="10" Background="#2D4A6B" ClipToBounds="True">
+                <Panel>
+                  <TextBlock Text="{Binding Title.Initials}" Foreground="White" FontSize="18" FontWeight="SemiBold"
+                             HorizontalAlignment="Center" VerticalAlignment="Center" />
+                  <Image Source="{Binding Title.Poster}" Stretch="UniformToFill" />
+                </Panel>
+              </Border>
+              <StackPanel Grid.Column="1" Spacing="6">
+                <TextBlock Text="{Binding Title.Name}" FontSize="24" FontWeight="SemiBold" TextWrapping="Wrap" />
+                <TextBlock Text="{Binding Title.Details}" Classes="muted" />
+                <TextBlock Text="{Binding Title.Title.Overview}" TextWrapping="Wrap" MaxWidth="720" HorizontalAlignment="Left"
+                           MaxLines="4" TextTrimming="WordEllipsis" Foreground="#45433F" />
+              </StackPanel>
             </Grid>
-          </Border>
 
-          <StackPanel Orientation="Horizontal" Spacing="10">
-            <TextBlock Classes="h2" Text="Releases" />
-            <TextBlock Text="{Binding Summary}" Classes="muted" VerticalAlignment="Bottom" />
-            <TextBlock Text="Searching trackers…" Classes="muted" VerticalAlignment="Bottom" IsVisible="{Binding IsLoading}" />
+            <Border Classes="card">
+              <Grid ColumnDefinitions="96,*" RowDefinitions="Auto,Auto,Auto,Auto" RowSpacing="10">
+                <TextBlock Grid.Row="0" Text="Language" Classes="muted" FontSize="12" VerticalAlignment="Center" />
+                <ItemsControl Grid.Row="0" Grid.Column="1" ItemsSource="{Binding Languages}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel ItemSpacing="8" LineSpacing="8" /></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:FilterChip">
+                      <ToggleButton Classes="chip" Content="{Binding Label}" IsChecked="{Binding IsSelected}" FontWeight="SemiBold" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock Grid.Row="1" Text="Voice-over" Classes="muted" FontSize="12" VerticalAlignment="Center" />
+                <ItemsControl Grid.Row="1" Grid.Column="1" ItemsSource="{Binding Voices}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel ItemSpacing="8" LineSpacing="8" /></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:FilterChip">
+                      <ToggleButton Classes="chip" Content="{Binding Label}" IsChecked="{Binding IsSelected}" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock Grid.Row="2" Text="Season" Classes="muted" FontSize="12" VerticalAlignment="Center" IsVisible="{Binding HasSeasons}" />
+                <ItemsControl Grid.Row="2" Grid.Column="1" ItemsSource="{Binding Seasons}" IsVisible="{Binding HasSeasons}">
+                  <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel ItemSpacing="8" LineSpacing="8" /></ItemsPanelTemplate>
+                  </ItemsControl.ItemsPanel>
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:FilterChip">
+                      <ToggleButton Classes="chip" Content="{Binding Label}" IsChecked="{Binding IsSelected}" />
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <TextBlock Grid.Row="3" Grid.ColumnSpan="2" Classes="muted" FontSize="12" TextWrapping="Wrap"
+                           Text="1080p only, cam rips hidden. Your voice-over profile first, then source, MKV, x265, seeders." />
+              </Grid>
+            </Border>
+
+            <StackPanel Orientation="Horizontal" Spacing="10">
+              <TextBlock Classes="h2" Text="Releases" />
+              <TextBlock Text="{Binding Summary}" Classes="muted" VerticalAlignment="Bottom" />
+              <TextBlock Text="Searching trackers…" Classes="muted" VerticalAlignment="Bottom" IsVisible="{Binding IsLoading}" />
+            </StackPanel>
+            <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap"
+                       IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
           </StackPanel>
-          <TextBlock Classes="error" Text="{Binding Error}" TextWrapping="Wrap"
-                     IsVisible="{Binding Error, Converter={x:Static ObjectConverters.IsNotNull}}" />
-        </StackPanel>
 
-        <ScrollViewer>
-          <ItemsControl ItemsSource="{Binding Releases}" Margin="0,0,0,24">
-            <ItemsControl.ItemsPanel>
-              <ItemsPanelTemplate><StackPanel Spacing="10" /></ItemsPanelTemplate>
-            </ItemsControl.ItemsPanel>
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:ReleaseRowViewModel">
-                <Border Classes="card" BorderBrush="{Binding IsBest, Converter={x:Static vm:ViewConverters.BestBorder}}">
-                  <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
-                    <StackPanel Spacing="8">
-                      <WrapPanel ItemSpacing="8" LineSpacing="4">
-                        <Border Classes="tag" Background="#18794E" IsVisible="{Binding IsBest}">
-                          <TextBlock Text="BEST MATCH" Foreground="White" FontSize="11" FontWeight="Bold" />
-                        </Border>
-                        <Border Classes="tag" IsVisible="{Binding IsRemux}">
-                          <TextBlock Text="REMUX · ORIGINAL" FontSize="11" FontWeight="Bold" />
-                        </Border>
-                        <TextBlock Text="{Binding Quality}" FontWeight="SemiBold" VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding Episodes}" Classes="muted" VerticalAlignment="Center"
-                                   IsVisible="{Binding Episodes, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                      </WrapPanel>
-                      <ItemsControl ItemsSource="{Binding Audio}">
-                        <ItemsControl.ItemsPanel>
-                          <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="6" /></ItemsPanelTemplate>
-                        </ItemsControl.ItemsPanel>
-                        <ItemsControl.ItemTemplate>
-                          <DataTemplate x:DataType="vm:AudioChip">
-                            <Border Classes="tag" Classes.preferred="{Binding IsPreferred}">
-                              <TextBlock Text="{Binding Text}" FontSize="12" />
-                            </Border>
-                          </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                      </ItemsControl>
-                      <TextBlock Text="{Binding Subtitles}" Classes="muted" FontSize="12"
-                                 IsVisible="{Binding Subtitles, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                      <TextBlock Text="{Binding Release.Title}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
-                      <TextBlock Text="{Binding Warning}" Foreground="#9A5B00" FontSize="12" TextWrapping="Wrap"
-                                 IsVisible="{Binding Warning, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="24" VerticalAlignment="Center">
-                      <StackPanel>
-                        <TextBlock Text="{Binding Size}" FontWeight="SemiBold" HorizontalAlignment="Right" />
-                        <TextBlock Text="size" Classes="muted" FontSize="12" HorizontalAlignment="Right" />
+          <ScrollViewer>
+            <ItemsControl ItemsSource="{Binding Releases}" Margin="0,0,0,24">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Spacing="10" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:ReleaseRowViewModel">
+                  <Border Classes="card" BorderBrush="{Binding IsBest, Converter={x:Static vm:ViewConverters.BestBorder}}">
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="24">
+                      <StackPanel Spacing="8">
+                        <WrapPanel ItemSpacing="8" LineSpacing="4">
+                          <Border Classes="tag" Background="#18794E" IsVisible="{Binding IsBest}">
+                            <TextBlock Text="BEST MATCH" Foreground="White" FontSize="11" FontWeight="Bold" />
+                          </Border>
+                          <Border Classes="tag" IsVisible="{Binding IsRemux}">
+                            <TextBlock Text="REMUX · ORIGINAL" FontSize="11" FontWeight="Bold" />
+                          </Border>
+                          <TextBlock Text="{Binding Quality}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                          <TextBlock Text="{Binding Episodes}" Classes="muted" VerticalAlignment="Center"
+                                     IsVisible="{Binding Episodes, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                        </WrapPanel>
+                        <ItemsControl ItemsSource="{Binding Audio}">
+                          <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><WrapPanel ItemSpacing="6" LineSpacing="6" /></ItemsPanelTemplate>
+                          </ItemsControl.ItemsPanel>
+                          <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:AudioChip">
+                              <Border Classes="tag" Classes.preferred="{Binding IsPreferred}">
+                                <TextBlock Text="{Binding Text}" FontSize="12" />
+                              </Border>
+                            </DataTemplate>
+                          </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Text="{Binding Subtitles}" Classes="muted" FontSize="12"
+                                   IsVisible="{Binding Subtitles, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                        <TextBlock Text="{Binding Release.Title}" Classes="muted" FontSize="11" TextWrapping="Wrap" />
+                        <TextBlock Text="{Binding Warning}" Foreground="#9A5B00" FontSize="12" TextWrapping="Wrap"
+                                   IsVisible="{Binding Warning, Converter={x:Static ObjectConverters.IsNotNull}}" />
                       </StackPanel>
-                      <StackPanel MinWidth="48">
-                        <TextBlock Text="{Binding Seeders}" FontWeight="SemiBold" Foreground="#18794E" HorizontalAlignment="Right" />
-                        <TextBlock Text="seeders" Classes="muted" FontSize="12" HorizontalAlignment="Right" />
+                      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="24" VerticalAlignment="Center">
+                        <StackPanel>
+                          <TextBlock Text="{Binding Size}" FontWeight="SemiBold" HorizontalAlignment="Right" />
+                          <TextBlock Text="size" Classes="muted" FontSize="12" HorizontalAlignment="Right" />
+                        </StackPanel>
+                        <StackPanel MinWidth="48">
+                          <TextBlock Text="{Binding Seeders}" FontWeight="SemiBold" Foreground="#18794E" HorizontalAlignment="Right" />
+                          <TextBlock Text="seeders" Classes="muted" FontSize="12" HorizontalAlignment="Right" />
+                        </StackPanel>
+                        <Button Classes.accent="{Binding !IsAdded}" MinWidth="150"
+                                Content="{Binding DownloadLabel}" Command="{Binding DownloadCommand}" IsEnabled="{Binding !IsAdded}" />
                       </StackPanel>
-                      <Button Classes.accent="{Binding !IsAdded}" MinWidth="150"
-                              Content="{Binding DownloadLabel}" Command="{Binding DownloadCommand}" IsEnabled="{Binding !IsAdded}" />
-                    </StackPanel>
-                  </Grid>
-                </Border>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
-        </ScrollViewer>
-      </DockPanel>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+        </DockPanel>
+      </Panel>
     </DockPanel>
   </Panel>
 </UserControl>

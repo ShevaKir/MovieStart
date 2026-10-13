@@ -38,6 +38,21 @@ public sealed class MpvPlayerTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ReportsTheFileThatPlayedToItsEnd()
+    {
+        var finished = new List<string>();
+        _player.PlaybackFinished += finished.Add;
+
+        await _mpv.SendPropertyChangeAsync("path", "/mnt/series/S01E01.mkv");
+        await _mpv.SendPropertyChangeAsync("path", null);
+        await _mpv.SendEventAsync(new { @event = "end-file", reason = "stop" });
+        await _mpv.SendEventAsync(new { @event = "end-file", reason = "eof" });
+
+        await Eventually.AssertAsync(() => finished.Count > 0, "the end of the file is reported");
+        Assert.Equal(["/mnt/series/S01E01.mkv"], finished);
+    }
+
+    [Fact]
     public async Task MirrorsPropertyChangesIntoState()
     {
         await _mpv.SendPropertyChangeAsync("idle-active", false);

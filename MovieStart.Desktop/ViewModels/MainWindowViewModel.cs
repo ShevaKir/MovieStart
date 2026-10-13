@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MovieStart.Client;
 using MovieStart.Desktop.Services;
 
 namespace MovieStart.Desktop.ViewModels;

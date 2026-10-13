@@ -1,0 +1,101 @@
+@inherits StoreComponent
+@inject PlayerStore Player
+
+<footer class="remote">
+    @if (!Player.State.IsConnected)
+    {
+        <p class="idle muted">Player is not running</p>
+    }
+    else if (!Player.HasMedia)
+    {
+        <p class="idle muted">Nothing is playing</p>
+    }
+    else
+    {
+        var state = Player.State;
+        <strong class="title">@(state.Title ?? "Playing")</strong>
+
+        <div class="timeline">
+            <span>@Format.Duration(_seeking ?? state.Position)</span>
+            <input type="range" min="0" max="@Max(state.Duration)" step="1" value="@Whole(_seeking ?? state.Position)" aria-label="Position"
+                   @oninput="e => _seeking = Parse(e.Value)" @onchange="CommitSeekAsync" />
+            <span>@Format.Duration(state.Duration)</span>
+        </div>
+
+        <div class="controls">
+            <div class="transport">
+                <button class="ghost" aria-label="Back 30 seconds" @onclick="() => Player.SeekByAsync(-PlayerStore.SeekStepSeconds)">
+                    <Icon Path="@Icons.Rewind" />
+                    30
+                </button>
+                <PauseButton State="state" />
+                <button class="ghost" aria-label="Forward 30 seconds" @onclick="() => Player.SeekByAsync(PlayerStore.SeekStepSeconds)">
+                    30
+                    <Icon Path="@Icons.Forward" />
+                </button>
+                <button class="ghost icon" aria-label="Stop" @onclick="Player.StopAsync">
+                    <Icon Path="@Icons.Stop" />
+                </button>
+            </div>
+            <div class="volume">
+                <Icon Path="@Icons.Volume" />
+                <input type="range" min="0" max="100" step="1" value="@(_volume ?? state.Volume)" aria-label="Volume"
+                       @oninput="e => _volume = (int?)Parse(e.Value)" @onchange="CommitVolumeAsync" />
+            </div>
+        </div>
+
+        <div class="tracks">
+            <select aria-label="Audio track" value="@state.AudioTrackId" @onchange="SetAudioAsync">
+                @foreach (var track in state.AudioTracks)
+                {
+                    <option value="@track.Id">@track.Label()</option>
+                }
+            </select>
+            <select aria-label="Subtitles" value="@(state.SubtitleTrackId?.ToString() ?? "")" @onchange="SetSubtitlesAsync">
+                <option value="">Subtitles off</option>
+                @foreach (var track in state.SubtitleTracks)
+                {
+                    <option value="@track.Id">@track.Label()</option>
+                }
+            </select>
+        </div>
+    }
+</footer>
+
+@code {
+    // Values being dragged; polling must not move the slider under the finger.
+    private double? _seeking;
+    private int? _volume;
+
+    protected override void OnInitialized() => Watch(Player);
+
+    private async Task CommitSeekAsync(ChangeEventArgs e)
+    {
+        if (Parse(e.Value) is { } position)
+            await Player.SeekToAsync(position);
+        _seeking = null;
+    }
+
+    private async Task CommitVolumeAsync(ChangeEventArgs e)
+    {
+        if (Parse(e.Value) is { } volume)
+            await Player.SetVolumeAsync((int)volume);
+        _volume = null;
+    }
+
+    private Task SetAudioAsync(ChangeEventArgs e) =>
+        int.TryParse(e.Value as string, out var id) ? Player.SetAudioTrackAsync(id) : Task.CompletedTask;
+
+    private Task SetSubtitlesAsync(ChangeEventArgs e) =>
+        Player.SetSubtitleTrackAsync(int.TryParse(e.Value as string, out var id) ? id : null);
+
+    private static double? Parse(object? value) =>
+        double.TryParse(value as string, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var number)
+            ? number
+            : null;
+
+    private static long Whole(double seconds) => (long)Math.Floor(seconds);
+
+    // A range needs a positive maximum even before the duration is known.
+    private static long Max(double duration) => Math.Max(1, Whole(duration));
+}

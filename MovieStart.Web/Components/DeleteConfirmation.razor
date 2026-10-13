@@ -1,0 +1,17 @@
+@* Asks before deleting something from the Pi; shown under the row it belongs to. *@
+<div class="confirm" role="alertdialog">
+    <p>@ChildContent</p>
+    <button @onclick="OnCancel">Cancel</button>
+    <button class="danger" @onclick="OnConfirm">Delete</button>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public RenderFragment ChildContent { get; set; } = null!;
+
+    [Parameter, EditorRequired]
+    public EventCallback OnCancel { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback OnConfirm { get; set; }
+}

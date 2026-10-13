@@ -1,0 +1,18 @@
+.row { display: grid; gap: 8px; padding: 8px 6px 8px 12px; }
+
+.line { display: grid; grid-template-columns: 58px 1fr auto; align-items: center; gap: 10px; }
+
+.code { font-weight: 600; font-variant-numeric: tabular-nums; }
+.code.watched { color: var(--muted); }
+
+.text { display: grid; gap: 4px; min-width: 0; }
+.name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; color: var(--muted); }
+.meta { font-size: 11px; color: var(--muted); }
+
+.progress { height: 6px; border-radius: 3px; background: var(--line); overflow: hidden; }
+.progress span { display: block; height: 100%; background: var(--accent); }
+
+.tools { display: flex; gap: 0; }
+
+.on-tv { background: var(--accent-soft); }
+.on-tv .meta { color: var(--accent); font-weight: 600; }

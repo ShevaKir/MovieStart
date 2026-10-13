@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using MovieStart.Client;
 using MovieStart.Desktop.Services;
 using MovieStart.Shared.Library;
 
@@ -38,17 +39,12 @@ public partial class LibraryItemViewModel : ObservableObject, IKeyed<Guid>
 
     public string Title => Item.Title;
 
-    public string Subtitle => string.Join(" · ", new[]
-    {
-        Item.Year?.ToString(),
-        Item.Kind == MediaKind.Series ? "Series" : "Movie",
-        Item.Files.Count > 0 ? Format.Size(Item.Files.Sum(file => file.SizeBytes)) : null,
-    }.Where(part => part is not null));
+    public string Subtitle => Item.Summary();
 
     public bool IsSeries => Item.Kind == MediaKind.Series;
 
     /// <summary>First letters of the title; shown until the poster loads, or when there is none.</summary>
-    public string Initials => string.Concat(Item.Title.Split(' ', StringSplitOptions.RemoveEmptyEntries).Take(2).Select(word => word[0]));
+    public string Initials => Item.Initials();
 
     public ObservableCollection<DownloadViewModel> Downloads { get; } = [];
 
@@ -58,26 +54,10 @@ public partial class LibraryItemViewModel : ObservableObject, IKeyed<Guid>
 
     public bool CanPlay => Item.Files.Count > 0;
 
-    public string PlayLabel
-    {
-        get
-        {
-            if (Item.ChooseFileToContinue() is not { } next)
-                return "Watch";
-
-            var episode = next.EpisodeCode is { } code ? $" {code}" : string.Empty;
-            if (next.Id == Item.LastPlayedFileId)
-            {
-                return next.Position > 0 ? $"Continue{episode} from {Format.Duration(next.Position)}" : $"Continue{episode}";
-            }
-
-            // The last played episode is finished, so another one is offered.
-            return Item.LastPlayedFileId is not null && IsSeries ? $"Next{episode}" : $"Watch{episode}";
-        }
-    }
+    public string PlayLabel => Item.PlayLabel();
 
     /// <summary>The file being continued was stopped partway, so it can also be restarted.</summary>
-    public bool CanStartOver => Item.ChooseFileToContinue() is { Position: > 0 } next && next.Id == Item.LastPlayedFileId;
+    public bool CanStartOver => Item.CanStartOver();
 
     public string? EpisodesSummary
     {

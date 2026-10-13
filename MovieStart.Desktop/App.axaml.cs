@@ -2,6 +2,7 @@ using Avalonia;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Microsoft.Extensions.Configuration;
+using MovieStart.Client;
 using MovieStart.Desktop.Services;
 using MovieStart.Desktop.ViewModels;
 using MovieStart.Desktop.Views;

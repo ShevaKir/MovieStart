@@ -1,0 +1,22 @@
+@* The item's poster from the Pi, or its initials until it loads or when there is none. *@
+<div class="poster @Size">
+    @if (Item.PosterUrl is not null && !_failed)
+    {
+        <img src="@ApiRoutes.LibraryPoster(Item.Id).TrimStart('/')" alt="" loading="lazy" @onerror="() => _failed = true" />
+    }
+    else
+    {
+        <span>@Item.Initials()</span>
+    }
+</div>
+
+@code {
+    private bool _failed;
+
+    [Parameter, EditorRequired]
+    public LibraryItem Item { get; set; } = null!;
+
+    /// <summary>"small" for list rows, "large" for the item page.</summary>
+    [Parameter]
+    public string Size { get; set; } = "small";
+}

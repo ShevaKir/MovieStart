@@ -1,0 +1,96 @@
+@page "/items/{Id:guid}"
+@inherits StoreComponent
+@inject LibraryStore Library
+@inject PlayerStore Player
+@inject NavigationManager Navigation
+
+<a class="link muted back" href="">
+    <Icon Path="@Icons.Back" />
+    Library
+</a>
+
+@if (Library.Find(Id) is not { } item)
+{
+    <p class="empty muted">@(Library.IsLoaded ? "This title is no longer in the library." : "Loading…")</p>
+}
+else
+{
+    <PageTitle>@item.Title · MovieStart</PageTitle>
+
+    <section class="hero">
+        <Poster Item="item" Size="large" />
+        <div class="text">
+            <h1>@item.Title</h1>
+            @if (item.OriginalTitle is { } original && original != item.Title)
+            {
+                <span class="muted">@original</span>
+            }
+            <span class="muted">@item.Summary()</span>
+            @if (item.DownloadStatusText() is { } downloading)
+            {
+                <span class="downloading">@downloading</span>
+            }
+        </div>
+    </section>
+
+    <div class="actions">
+        @if (item.CanStartOver() && item.ChooseFileToContinue() is { } next)
+        {
+            <button @onclick="() => Library.PlayAsync(item.Id, new PlayItemRequest(next.Id, FromStart: true))">Start over</button>
+        }
+        @if (item.Files.Count > 0)
+        {
+            <button class="accent play-main" @onclick="() => Library.PlayAsync(item.Id, new PlayItemRequest())">
+                <Icon Path="@Icons.Play" />
+                @item.PlayLabel()
+            </button>
+        }
+        <button class="icon" title="Delete" aria-label="Delete" @onclick="() => _confirmingDelete = true">
+            <Icon Path="@Icons.Delete" />
+        </button>
+    </div>
+
+    @if (_confirmingDelete)
+    {
+        <DeleteConfirmation OnCancel="() => _confirmingDelete = false" OnConfirm="() => DeleteAsync(item)">
+            Delete <strong>@item.Title</strong> and all its files from the Pi? This cannot be undone.
+        </DeleteConfirmation>
+    }
+
+    @if (item.Kind == MediaKind.Series && item.Files.Count > 0)
+    {
+        @foreach (var season in item.Files.GroupBy(file => file.Season))
+        {
+            <h2>@(season.Key is { } number ? $"Season {number}" : "Other files")</h2>
+            <ul class="episodes">
+                @foreach (var file in season)
+                {
+                    <li @key="file.Id">
+                        <EpisodeRow ItemId="item.Id" File="file" IsOnTv="IsOnTv(file)" />
+                    </li>
+                }
+            </ul>
+        }
+    }
+
+}
+
+@code {
+    private bool _confirmingDelete;
+
+    [Parameter]
+    public Guid Id { get; set; }
+
+    protected override void OnInitialized() => Watch(Library, Player);
+
+    private bool IsOnTv(MediaFile file) =>
+        Player.HasMedia && Player.State.FilePath?.EndsWith("/" + file.Name, StringComparison.Ordinal) == true;
+
+    private async Task DeleteAsync(LibraryItem item)
+    {
+        _confirmingDelete = false;
+        await Library.DeleteItemAsync(item.Id);
+        if (Library.Find(item.Id) is null)
+            Navigation.NavigateTo("");
+    }
+}

@@ -1,0 +1,27 @@
+@inherits LayoutComponentBase
+@inject LibraryStore Library
+@inject PlayerStore Player
+
+<div class="shell">
+    <header class="top">
+        <a class="brand" href="">MovieStart</a>
+        <span class="status @(Library.IsOnline ? "online" : "offline")">@(Library.IsOnline ? "Pi online" : "Pi offline")</span>
+    </header>
+
+    <main>@Body</main>
+
+    <RemoteBar />
+</div>
+
+<Toast />
+
+@code {
+    protected override void OnInitialized()
+    {
+        Library.Changed += Refresh;
+        Library.Start();
+        Player.Start();
+    }
+
+    private void Refresh() => _ = InvokeAsync(StateHasChanged);
+}

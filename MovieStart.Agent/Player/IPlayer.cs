@@ -6,6 +6,9 @@ public interface IPlayer
 {
     PlayerState State { get; }
 
+    /// <summary>Raised with the file's path when it plays to its end; not when it is stopped or replaced.</summary>
+    event Action<string>? PlaybackFinished;
+
     /// <exception cref="PlayerUnavailableException">The player process is not reachable.</exception>
     /// <exception cref="PlayerCommandException">The player rejected the command.</exception>
     Task PlayAsync(string path, PlaybackOptions options, CancellationToken cancellationToken);
