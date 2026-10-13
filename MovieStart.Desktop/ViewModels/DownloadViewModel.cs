@@ -161,7 +161,13 @@ public partial class DownloadViewModel : ObservableObject, IKeyed<Guid>
     private void SyncEpisodes() =>
         CollectionSync.Sync(
             Episodes,
-            Download.Files?.Where(file => file.IsVideo).ToList() ?? [],
+            // qBittorrent lists files in torrent order, which is not episode order.
+            Download.Files?
+                .Where(file => file.IsVideo)
+                .OrderBy(file => file.Season ?? int.MaxValue)
+                .ThenBy(file => file.Episode ?? int.MaxValue)
+                .ThenBy(file => file.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList() ?? [],
             file => file.Index,
             file => new DownloadFileViewModel(this, file),
             (vm, file) => vm.Update(file, keepTick: IsAwaitingChoice));

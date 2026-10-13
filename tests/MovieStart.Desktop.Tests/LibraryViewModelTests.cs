@@ -266,6 +266,27 @@ public class LibraryViewModelTests
     }
 
     [Fact]
+    public void EpisodesToChooseAreInEpisodeOrder()
+    {
+        var download = new LibraryDownload
+        {
+            Id = Guid.NewGuid(),
+            Season = 7,
+            Status = DownloadStatus.ChoosingFiles,
+            Files =
+            [
+                new DownloadFile(0, "S07E23.mkv", 2 * Gb, Wanted: true, IsVideo: true, Season: 7, Episode: 23),
+                new DownloadFile(1, "Bonus.mkv", 2 * Gb, Wanted: true, IsVideo: true),
+                new DownloadFile(2, "S07E03.mkv", 2 * Gb, Wanted: true, IsVideo: true, Season: 7, Episode: 3),
+                new DownloadFile(3, "S07E10.mkv", 2 * Gb, Wanted: true, IsVideo: true, Season: 7, Episode: 10),
+            ],
+        };
+        var row = new LibraryItemViewModel(_library, Series(null) with { Downloads = [download] }).Downloads[0];
+
+        Assert.Equal(["S07E03", "S07E10", "S07E23", "Bonus"], row.Episodes.Select(episode => episode.Label));
+    }
+
+    [Fact]
     public void NoEpisodesChosenCannotStart()
     {
         var download = new LibraryDownload
