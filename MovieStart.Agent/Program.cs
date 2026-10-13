@@ -1,6 +1,5 @@
 using System.Reflection;
 using Microsoft.Extensions.Options;
-using MovieStart.Agent.Demo;
 using MovieStart.Agent.Downloads;
 using MovieStart.Agent.Library;
 using MovieStart.Agent.Media;
@@ -24,39 +23,29 @@ builder.Services.Configure<PlayerOptions>(builder.Configuration.GetSection(Playe
 builder.Services.Configure<QbitOptions>(builder.Configuration.GetSection(QbitOptions.SectionName));
 builder.Services.Configure<ProwlarrOptions>(builder.Configuration.GetSection(ProwlarrOptions.SectionName));
 builder.Services.Configure<TmdbOptions>(builder.Configuration.GetSection(TmdbOptions.SectionName));
-builder.Services.Configure<DemoOptions>(builder.Configuration.GetSection(DemoOptions.SectionName));
-
-var isDemo = builder.Configuration.GetValue<bool>($"{DemoOptions.SectionName}:{nameof(DemoOptions.Enabled)}");
 
 builder.Services.AddSingleton(TimeProvider.System);
 builder.Services.AddSingleton<IStorageProbe, DriveStorageProbe>();
 builder.Services.AddSingleton<IMediaProbe, FfprobeMediaProbe>();
 builder.Services.AddSingleton<IVoiceProfileStore, FileVoiceProfileStore>();
 
-if (isDemo)
-{
-    builder.Services.AddDemoMode();
-}
-else
-{
-    builder.Services.AddSingleton<MpvPlayer>();
-    builder.Services.AddSingleton<IPlayer>(services => services.GetRequiredService<MpvPlayer>());
-    builder.Services.AddHostedService(services => services.GetRequiredService<MpvPlayer>());
+builder.Services.AddSingleton<MpvPlayer>();
+builder.Services.AddSingleton<IPlayer>(services => services.GetRequiredService<MpvPlayer>());
+builder.Services.AddHostedService(services => services.GetRequiredService<MpvPlayer>());
 
-    // One long-lived client: qBittorrent keeps the login in a session cookie.
-    builder.Services.AddSingleton<IQbitClient>(services => new QbitClient(
-        new HttpClient(new SocketsHttpHandler
-        {
-            CookieContainer = new(),
-            PooledConnectionLifetime = TimeSpan.FromMinutes(5),
-        })
-        {
-            Timeout = TimeSpan.FromSeconds(10),
-        },
-        services.GetRequiredService<IOptions<QbitOptions>>()));
+// One long-lived client: qBittorrent keeps the login in a session cookie.
+builder.Services.AddSingleton<IQbitClient>(services => new QbitClient(
+    new HttpClient(new SocketsHttpHandler
+    {
+        CookieContainer = new(),
+        PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+    })
+    {
+        Timeout = TimeSpan.FromSeconds(10),
+    },
+    services.GetRequiredService<IOptions<QbitOptions>>()));
 
-    builder.Services.AddHttpClient<IProwlarrClient, ProwlarrClient>(client => client.Timeout = TimeSpan.FromSeconds(30));
-}
+builder.Services.AddHttpClient<IProwlarrClient, ProwlarrClient>(client => client.Timeout = TimeSpan.FromSeconds(30));
 
 builder.Services.AddSingleton<ILibraryStore, FileLibraryStore>();
 builder.Services.AddSingleton<LibraryService>();
@@ -73,13 +62,11 @@ var app = builder.Build();
 var version = Assembly.GetExecutingAssembly()
     .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "unknown";
 
-app.MapGet(ApiRoutes.Health, () => new HealthResponse(version, DateTimeOffset.UtcNow, isDemo));
+app.MapGet(ApiRoutes.Health, () => new HealthResponse(version, DateTimeOffset.UtcNow));
 app.MapPlayerEndpoints();
 app.MapLibraryEndpoints();
 app.MapSearchEndpoints();
 app.MapProfileEndpoints();
-if (isDemo)
-    app.MapDemoEndpoints();
 
 app.Run();
 

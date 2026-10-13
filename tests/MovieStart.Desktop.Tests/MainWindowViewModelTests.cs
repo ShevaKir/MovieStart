@@ -64,31 +64,6 @@ public class MainWindowViewModelTests
     }
 
     [Fact]
-    public async Task DemoAgentShowsTheDemoMenu()
-    {
-        var agent = new FakeAgentClient { Health = new HealthResponse("1.0.0", DateTimeOffset.UtcNow, IsDemo: true) };
-        var viewModel = new MainWindowViewModel(agent, "http://localhost:5080", new NoPosters());
-
-        await viewModel.CheckConnectionAsync(TestContext.Current.CancellationToken);
-
-        Assert.True(viewModel.IsDemo);
-        Assert.Equal("Demo · agent 1.0.0", viewModel.StatusText);
-    }
-
-    [Fact]
-    public async Task DemoButtonsCallTheAgent()
-    {
-        var agent = new FakeAgentClient();
-        var viewModel = new MainWindowViewModel(agent, "http://localhost:5080", new NoPosters());
-
-        await viewModel.CompleteDemoDownloadsCommand.ExecuteAsync(null);
-        await viewModel.ResetDemoCommand.ExecuteAsync(null);
-
-        Assert.Equal(["demo complete", "demo reset"], agent.Calls);
-        Assert.Equal("Demo library cleared.", viewModel.DemoStatus);
-    }
-
-    [Fact]
     public async Task OpeningSettingsLoadsTheVoiceProfile()
     {
         var agent = new FakeAgentClient();

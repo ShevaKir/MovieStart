@@ -62,12 +62,6 @@ public interface IAgentClient
     Task<AgentResult<VoiceProfile>> GetVoiceProfileAsync(string agentUrl, CancellationToken cancellationToken = default);
 
     Task<AgentResult> SaveVoiceProfileAsync(string agentUrl, VoiceProfile profile, CancellationToken cancellationToken = default);
-
-    /// <summary>Demo mode only: finish all simulated downloads.</summary>
-    Task<AgentResult> CompleteDemoDownloadsAsync(string agentUrl, CancellationToken cancellationToken = default);
-
-    /// <summary>Demo mode only: delete the demo library.</summary>
-    Task<AgentResult> ResetDemoAsync(string agentUrl, CancellationToken cancellationToken = default);
 }
 
 /// <param name="http">Should have no timeout of its own; each call sets one.</param>
@@ -157,12 +151,6 @@ public sealed class AgentClient(HttpClient http) : IAgentClient
 
     public Task<AgentResult> SaveVoiceProfileAsync(string agentUrl, VoiceProfile profile, CancellationToken cancellationToken = default) =>
         SendAsync(agentUrl, HttpMethod.Put, ApiRoutes.VoiceProfile, cancellationToken, JsonContent.Create(profile));
-
-    public Task<AgentResult> CompleteDemoDownloadsAsync(string agentUrl, CancellationToken cancellationToken = default) =>
-        SendAsync(agentUrl, HttpMethod.Post, ApiRoutes.DemoCompleteDownloads, cancellationToken);
-
-    public Task<AgentResult> ResetDemoAsync(string agentUrl, CancellationToken cancellationToken = default) =>
-        SendAsync(agentUrl, HttpMethod.Post, ApiRoutes.DemoReset, cancellationToken, timeout: SearchTimeout);
 
     /// <summary>GET that reports why it failed, unlike the polling reads that just return null.</summary>
     private async Task<AgentResult<T>> GetResultAsync<T>(string agentUrl, string route, CancellationToken cancellationToken, TimeSpan timeout)
