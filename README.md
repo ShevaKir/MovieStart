@@ -85,7 +85,7 @@ Tmdb__ReadAccessToken=...
 Then, from the Mac:
 
 ```bash
-./scripts/deploy.sh   # publishes linux-arm64, installs /opt/moviestart, moviestart-agent.service and the mpv user unit
+./scripts/deploy.sh   # publishes linux-arm64, installs /opt/moviestart, moviestart-agent.service and the mpv user unit, restarts both
 ```
 
 ## Design
