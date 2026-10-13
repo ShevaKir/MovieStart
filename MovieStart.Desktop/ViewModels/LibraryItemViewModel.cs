@@ -118,14 +118,15 @@ public partial class LibraryItemViewModel : ObservableObject, IKeyed<Guid>
 
     /// <summary>
     /// Episodes on the Pi plus the ones their season torrents can still fetch, in season and episode order.
-    /// An episode already on the Pi from another download is not offered again.
+    /// An episode already on the Pi from another download is not offered again. A season whose episodes are
+    /// still being chosen has its own list.
     /// </summary>
     private static List<EpisodeEntry> EpisodeEntries(LibraryItem item)
     {
         var names = item.Files.Select(file => file.Name.Replace('\\', '/')).ToHashSet();
         var codes = item.Files.Select(file => file.EpisodeCode).OfType<string>().ToHashSet();
         var missing = item.Downloads
-            .Where(download => download.Status != DownloadStatus.Error && download.Files is not null)
+            .Where(download => download.Status is not (DownloadStatus.Error or DownloadStatus.ChoosingFiles) && download.Files is not null)
             .SelectMany(download => download.Files!
                 .Where(file => file.IsVideo
                     && !names.Contains($"{download.Id:N}/{file.Name}")

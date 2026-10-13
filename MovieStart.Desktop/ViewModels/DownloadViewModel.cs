@@ -47,6 +47,26 @@ public partial class DownloadViewModel : ObservableObject, IKeyed<Guid>
 
     public string EpisodesChosen => $"Episodes: {Episodes.Count(episode => episode.IsWanted)} of {Episodes.Count}";
 
+    /// <summary>A season added to the Pi waits here until its episodes are chosen; nothing is fetched before.</summary>
+    public bool IsAwaitingChoice => Download.Status == DownloadStatus.ChoosingFiles;
+
+    public bool CanPickEpisodes => IsAwaitingChoice && Episodes.Count > 0;
+
+    private long ChosenBytes => Episodes.Where(episode => episode.IsWanted).Sum(episode => episode.File.SizeBytes);
+
+    /// <summary>"3 of 10 episodes · 6.2 GB · 38.0 GB free".</summary>
+    public string ChoiceSummary => string.Join(" · ", new[]
+    {
+        $"{Episodes.Count(episode => episode.IsWanted)} of {Episodes.Count} episodes",
+        Format.Size(ChosenBytes),
+        _library.Storage is { } storage ? $"{Format.Size(storage.FreeBytes)} free" : null,
+    }.Where(part => part is not null));
+
+    /// <summary>The Pi also keeps some space in reserve, so this is only a first warning.</summary>
+    public bool ChoiceExceedsFreeSpace => _library.Storage is { } storage && ChosenBytes > storage.FreeBytes;
+
+    public bool CanStart => Episodes.Any(episode => episode.IsWanted);
+
     public string Label => Download switch
     {
         { Season: { } s, Episode: { } e } => $"S{s:00}E{e:00}",
@@ -76,6 +96,7 @@ public partial class DownloadViewModel : ObservableObject, IKeyed<Guid>
     public string StatusText => Download.Status switch
     {
         DownloadStatus.Queued => "Queued · waiting for metadata",
+        DownloadStatus.ChoosingFiles => Download.Files is null ? "Reading the episode list…" : "Choose the episodes to download",
         DownloadStatus.Downloading => string.Join(" · ", new[]
         {
             $"{Percent:0}%",
@@ -116,6 +137,15 @@ public partial class DownloadViewModel : ObservableObject, IKeyed<Guid>
         OnPropertyChanged(string.Empty);
     }
 
+    /// <summary>A running download takes each tick at once; a season being chosen waits for <see cref="StartCommand"/>.</summary>
+    internal void OnEpisodeTicked()
+    {
+        if (IsAwaitingChoice)
+            OnPropertyChanged(string.Empty);
+        else
+            _ = SendSelectionAsync();
+    }
+
     /// <summary>Sends the ticked episodes; files that are not episodes (subtitles, audio) keep their state.</summary>
     internal Task SendSelectionAsync()
     {
@@ -134,7 +164,23 @@ public partial class DownloadViewModel : ObservableObject, IKeyed<Guid>
             Download.Files?.Where(file => file.IsVideo).ToList() ?? [],
             file => file.Index,
             file => new DownloadFileViewModel(this, file),
-            (vm, file) => vm.Update(file));
+            (vm, file) => vm.Update(file, keepTick: IsAwaitingChoice));
+
+    /// <summary>Starts a season with the ticked episodes.</summary>
+    [RelayCommand]
+    private Task StartAsync() => CanStart ? SendSelectionAsync() : Task.CompletedTask;
+
+    [RelayCommand]
+    private void ChooseAllEpisodes() => TickAll(true);
+
+    [RelayCommand]
+    private void ChooseNoEpisodes() => TickAll(false);
+
+    private void TickAll(bool wanted)
+    {
+        foreach (var episode in Episodes)
+            episode.IsWanted = wanted;
+    }
 
     [RelayCommand]
     private Task PauseAsync() => _library.PauseDownloadAsync(_itemId, Download.Id);

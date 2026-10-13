@@ -225,6 +225,76 @@ public class LibraryViewModelTests
     }
 
     [Fact]
+    public async Task SeasonStartsWithTheEpisodesChosenBeforehand()
+    {
+        _agent.Storage = new StorageInfo(500 * Gb, 5 * Gb);
+        await _library.RefreshAsync(Token);
+        var download = new LibraryDownload
+        {
+            Id = Guid.NewGuid(),
+            Season = 1,
+            Status = DownloadStatus.ChoosingFiles,
+            Files =
+            [
+                new DownloadFile(0, "S01/E01.mkv", 2 * Gb, Wanted: true, IsVideo: true, Season: 1, Episode: 1),
+                new DownloadFile(1, "S01/E02.mkv", 2 * Gb, Wanted: true, IsVideo: true, Season: 1, Episode: 2),
+                new DownloadFile(2, "S01/E03.mkv", 2 * Gb, Wanted: true, IsVideo: true, Season: 1, Episode: 3),
+                new DownloadFile(3, "S01/Subs/E01.srt", 1_000, Wanted: true),
+            ],
+        };
+        var item = new LibraryItemViewModel(_library, Series(null) with { Downloads = [download] });
+        var row = Assert.Single(item.Downloads);
+
+        Assert.True(row.CanPickEpisodes);
+        Assert.False(row.CanChooseEpisodes);
+        Assert.Empty(item.Episodes);
+        Assert.Equal("Choose the episodes to download", row.StatusText);
+        Assert.Equal("3 of 3 episodes · 6.0 GB · 5.0 GB free", row.ChoiceSummary);
+        Assert.True(row.ChoiceExceedsFreeSpace);
+
+        row.Episodes[1].IsWanted = false;
+        // A refresh while choosing keeps the ticks.
+        row.Update(download);
+
+        Assert.Equal("2 of 3 episodes · 4.0 GB · 5.0 GB free", row.ChoiceSummary);
+        Assert.False(row.ChoiceExceedsFreeSpace);
+        Assert.DoesNotContain(_agent.Calls, call => call.StartsWith("select", StringComparison.Ordinal));
+
+        await row.StartCommand.ExecuteAsync(null);
+
+        Assert.Contains($"select {download.Id} 0,2,3", _agent.Calls);
+    }
+
+    [Fact]
+    public void NoEpisodesChosenCannotStart()
+    {
+        var download = new LibraryDownload
+        {
+            Id = Guid.NewGuid(),
+            Season = 1,
+            Status = DownloadStatus.ChoosingFiles,
+            Files = [new DownloadFile(0, "S01/E01.mkv", 2 * Gb, Wanted: true, IsVideo: true, Season: 1, Episode: 1)],
+        };
+        var row = new LibraryItemViewModel(_library, Series(null) with { Downloads = [download] }).Downloads[0];
+
+        row.ChooseNoEpisodesCommand.Execute(null);
+
+        Assert.False(row.CanStart);
+        row.ChooseAllEpisodesCommand.Execute(null);
+        Assert.True(row.CanStart);
+    }
+
+    [Fact]
+    public void SeasonWaitsForItsEpisodeList()
+    {
+        var download = new LibraryDownload { Id = Guid.NewGuid(), Season = 1, Status = DownloadStatus.ChoosingFiles };
+        var row = new LibraryItemViewModel(_library, Series(null) with { Downloads = [download] }).Downloads[0];
+
+        Assert.False(row.CanPickEpisodes);
+        Assert.Equal("Reading the episode list…", row.StatusText);
+    }
+
+    [Fact]
     public async Task SeasonListsEpisodesOnThePiAndTheOnesLeftToDownload()
     {
         var downloadId = Guid.NewGuid();

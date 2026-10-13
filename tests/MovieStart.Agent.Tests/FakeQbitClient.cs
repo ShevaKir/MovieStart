@@ -7,6 +7,9 @@ public sealed class FakeQbitClient : IQbitClient
 {
     public List<(string Source, string SavePath, string Tag)> Added { get; } = [];
 
+    /// <summary>Tags of torrents added to stop once their metadata is in.</summary>
+    public List<string> StoppedWithMetadata { get; } = [];
+
     public List<QbitTorrent> Torrents { get; } = [];
 
     public Dictionary<string, List<QbitFile>> Files { get; } = [];
@@ -19,10 +22,12 @@ public sealed class FakeQbitClient : IQbitClient
 
     public bool Unavailable { get; set; }
 
-    public Task AddAsync(string source, string savePath, string tag, CancellationToken cancellationToken)
+    public Task AddAsync(string source, string savePath, string tag, bool stopWithMetadata, CancellationToken cancellationToken)
     {
         ThrowIfUnavailable();
         Added.Add((source, savePath, tag));
+        if (stopWithMetadata)
+            StoppedWithMetadata.Add(tag);
         return Task.CompletedTask;
     }
 
