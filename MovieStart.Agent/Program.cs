@@ -51,6 +51,7 @@ builder.Services.AddSingleton<ILibraryStore, FileLibraryStore>();
 builder.Services.AddSingleton<LibraryService>();
 builder.Services.AddHostedService<LibraryWatcher>();
 builder.Services.AddHostedService<WatchTracker>();
+builder.Services.AddHostedService<EpisodeAutoplay>();
 builder.Services.AddHostedService<PlaybackWatchdog>();
 
 builder.Services.AddHttpClient<ITmdbClient, TmdbClient>(client => client.Timeout = TimeSpan.FromSeconds(10));

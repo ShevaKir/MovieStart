@@ -387,6 +387,54 @@ public sealed class LibraryServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task FinishedEpisodeIsFollowedByTheNextOne()
+    {
+        var series = await AddReadySeasonAsync();
+
+        var played = await _library.PlayNextEpisodeAsync(PathOf(series, series.Files[0]), Token);
+
+        Assert.Equal(series.Files[1].Id, played?.Id);
+        Assert.Equal(PathOf(series, series.Files[1]), _player.PlayedPath);
+        Assert.Equal(series.Files[1].Id, _library.List()[0].LastPlayedFileId);
+    }
+
+    [Fact]
+    public async Task LastEpisodeOfTheSeasonEndsPlayback()
+    {
+        var series = await AddReadySeasonAsync();
+
+        var played = await _library.PlayNextEpisodeAsync(PathOf(series, series.Files[2]), Token);
+
+        Assert.Null(played);
+        Assert.Equal(0, _player.PlayCount);
+    }
+
+    [Fact]
+    public async Task MissingEpisodeEndsPlayback()
+    {
+        await _library.AddAsync(Series(season: 1), Token);
+        var series = await StartSeasonAsync(
+            "h1", [new QbitFile { Name = "S01E01.mkv", Size = 2 * Gb }, new QbitFile { Name = "S01E03.mkv", Size = 2 * Gb }], "uploading", 1);
+
+        var played = await _library.PlayNextEpisodeAsync(PathOf(series, series.Files[0]), Token);
+
+        Assert.Null(played);
+        Assert.Equal(0, _player.PlayCount);
+    }
+
+    [Fact]
+    public async Task NextEpisodeDoesNotReplaceWhatTheViewerStarted()
+    {
+        var series = await AddReadySeasonAsync();
+        _player.State = new PlayerState { IsConnected = true, IsIdle = false, FilePath = "/mnt/movies/Dune.mkv" };
+
+        var played = await _library.PlayNextEpisodeAsync(PathOf(series, series.Files[0]), Token);
+
+        Assert.Null(played);
+        Assert.Equal(0, _player.PlayCount);
+    }
+
+    [Fact]
     public async Task ExplicitFileFromStartIgnoresPosition()
     {
         var series = await AddReadySeasonAsync();

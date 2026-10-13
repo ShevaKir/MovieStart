@@ -23,8 +23,13 @@ public sealed partial class MpvPlayer(IOptions<PlayerOptions> options, ILogger<M
     private PlayerState _state = PlayerState.Disconnected;
     private volatile MpvIpcClient? _client;
 
+    // mpv clears "path" when a file ends, so the finished file is remembered here.
+    private string? _lastPath;
+
     // mpv 0.38 added an "index" argument to loadfile before the per-file options.
     private volatile bool _loadfileHasIndex = true;
+
+    public event Action<string>? PlaybackFinished;
 
     public PlayerState State
     {
@@ -165,8 +170,23 @@ public sealed partial class MpvPlayer(IOptions<PlayerOptions> options, ILogger<M
 
     private void OnEvent(JsonElement message)
     {
-        if (message.GetProperty("event").GetString() != "property-change")
-            return;
+        switch (message.GetProperty("event").GetString())
+        {
+            case "property-change":
+                OnPropertyChange(message);
+                break;
+            case "end-file" when message.TryGetProperty("reason", out var reason) && reason.GetString() == "eof":
+                string? path;
+                lock (_stateLock)
+                    path = _lastPath;
+                if (path is not null)
+                    PlaybackFinished?.Invoke(path);
+                break;
+        }
+    }
+
+    private void OnPropertyChange(JsonElement message)
+    {
 
         // "data" is absent when the property is unavailable, e.g. time-pos while idle.
         var data = message.TryGetProperty("data", out var value) ? value : default;
@@ -174,6 +194,9 @@ public sealed partial class MpvPlayer(IOptions<PlayerOptions> options, ILogger<M
 
         lock (_stateLock)
         {
+            if (name == "path" && AsString(data) is { } path)
+                _lastPath = path;
+
             _state = name switch
             {
                 "idle-active" => _state with { IsIdle = data.ValueKind == JsonValueKind.True },
