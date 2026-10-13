@@ -34,14 +34,17 @@ Mac (MovieStart.Desktop)                Raspberry Pi 5 (sheva-server.local)
 - Samples, trailers and extras inside torrents are skipped automatically.
 - Continue watching: the position of every file is remembered; "Continue" resumes the last episode or moves to the next one.
 - Pi disk usage, deletion of whole items, single downloads or single episodes, free-space check before a download starts.
+- Phone remote: the agent serves a web app at `http://sheva-server.local:5080` with the library (play, continue, start over, delete) and the player controls. No install needed; add it to the home screen.
 - No database: each item keeps its metadata in `item.json` next to its files on the movies disk.
 
 ## Structure
 
 ```
 MovieStart.slnx
-├─ MovieStart.Agent         — ASP.NET Core minimal API, linux-arm64
+├─ MovieStart.Agent         — ASP.NET Core minimal API, linux-arm64; also serves MovieStart.Web
 ├─ MovieStart.Desktop       — Avalonia UI, macOS
+├─ MovieStart.Web           — Blazor WebAssembly app for phones; features under Features/, agent data in State/ stores
+├─ MovieStart.Client        — agent HTTP client and wording shared by Desktop and Web
 ├─ MovieStart.Shared        — DTOs and API contracts
 └─ tests/                   — one xUnit project per project
 ```
@@ -57,7 +60,7 @@ The agent also runs on a Mac (mpv and qBittorrent via Homebrew), so the Pi is on
 
 ```bash
 cp MovieStart.Desktop/appsettings.Local.example.json MovieStart.Desktop/appsettings.Local.json  # point the app at localhost
-dotnet run --project MovieStart.Agent     # http://localhost:5080
+dotnet run --project MovieStart.Agent     # http://localhost:5080, also the web app
 dotnet run --project MovieStart.Desktop
 dotnet test --solution MovieStart.slnx
 ```

@@ -1,0 +1,35 @@
+@* Asks for a second tap before a destructive action. *@
+@if (_asking)
+{
+    <span class="confirm">
+        <span class="question">@Question</span>
+        <button class="danger" @onclick="ConfirmAsync">@Label</button>
+        <button class="ghost" @onclick="() => _asking = false">Cancel</button>
+    </span>
+}
+else
+{
+    <button class="@Class" @onclick="() => _asking = true">@Label</button>
+}
+
+@code {
+    private bool _asking;
+
+    [Parameter, EditorRequired]
+    public string Label { get; set; } = "";
+
+    [Parameter, EditorRequired]
+    public string Question { get; set; } = "";
+
+    [Parameter]
+    public string Class { get; set; } = "ghost";
+
+    [Parameter, EditorRequired]
+    public EventCallback OnConfirm { get; set; }
+
+    private async Task ConfirmAsync()
+    {
+        _asking = false;
+        await OnConfirm.InvokeAsync();
+    }
+}

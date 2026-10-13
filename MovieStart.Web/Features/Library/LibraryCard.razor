@@ -1,0 +1,27 @@
+@inject LibraryStore Library
+
+<div class="card">
+    <a class="open" href="items/@Item.Id">
+        <Poster Item="Item" />
+        <span class="text">
+            <strong>@Item.Title</strong>
+            <span class="muted">@Item.Summary()</span>
+            @if (Item.DownloadStatusText() is { } downloading)
+            {
+                <span class="downloading">@downloading</span>
+            }
+        </span>
+    </a>
+    @if (Item.Files.Count > 0)
+    {
+        <button class="accent play" @onclick="() => Library.PlayAsync(Item.Id, new PlayItemRequest())">
+            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+            <span>@Item.PlayLabel()</span>
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public LibraryItem Item { get; set; } = null!;
+}

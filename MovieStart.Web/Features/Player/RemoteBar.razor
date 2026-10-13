@@ -1,0 +1,118 @@
+@inherits StoreComponent
+@inject PlayerStore Player
+
+<footer class="remote">
+    @if (!Player.State.IsConnected)
+    {
+        <p class="idle muted">Player is not running</p>
+    }
+    else if (!Player.HasMedia)
+    {
+        <p class="idle muted">Nothing is playing</p>
+    }
+    else
+    {
+        var state = Player.State;
+        <div class="now">
+            <button class="title" aria-expanded="@_expanded" @onclick="() => _expanded = !_expanded">
+                <strong>@(state.Title ?? "Playing")</strong>
+                <span>@Format.Duration(state.Position) / @Format.Duration(state.Duration)</span>
+            </button>
+            @if (!_expanded)
+            {
+                <PauseButton State="state" Small="true" />
+            }
+            <button class="ghost expand" aria-label="@(_expanded ? "Hide controls" : "Show controls")" @onclick="() => _expanded = !_expanded">
+                <svg viewBox="0 0 24 24" class="@(_expanded ? "open" : null)"><path d="M7.41 15.41 12 10.83l4.59 4.58L18 14l-6-6-6 6z" /></svg>
+            </button>
+        </div>
+
+        @if (_expanded)
+        {
+            <div class="timeline">
+                <span>@Format.Duration(_seeking ?? state.Position)</span>
+                <input type="range" min="0" max="@Max(state.Duration)" step="1" value="@Whole(_seeking ?? state.Position)" aria-label="Position"
+                       @oninput="e => _seeking = Parse(e.Value)" @onchange="CommitSeekAsync" />
+                <span>@Format.Duration(state.Duration)</span>
+            </div>
+
+            <div class="transport">
+                <button class="ghost" aria-label="Back 30 seconds" @onclick="() => Player.SeekByAsync(-PlayerStore.SeekStepSeconds)">
+                    <svg viewBox="0 0 24 24"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" /></svg>
+                    30
+                </button>
+                <PauseButton State="state" />
+                <button class="ghost" aria-label="Forward 30 seconds" @onclick="() => Player.SeekByAsync(PlayerStore.SeekStepSeconds)">
+                    30
+                    <svg viewBox="0 0 24 24"><path d="M12 5V1l5 5-5 5V7c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6h2c0 4.42-3.58 8-8 8s-8-3.58-8-8 3.58-8 8-8z" /></svg>
+                </button>
+                <button class="ghost" aria-label="Stop" @onclick="Player.StopAsync">
+                    <svg viewBox="0 0 24 24"><path d="M6 6h12v12H6z" /></svg>
+                </button>
+            </div>
+
+            <div class="tracks">
+                <select aria-label="Audio track" value="@state.AudioTrackId" @onchange="SetAudioAsync">
+                    @foreach (var track in state.AudioTracks)
+                    {
+                        <option value="@track.Id">@track.Label()</option>
+                    }
+                </select>
+                <select aria-label="Subtitles" value="@(state.SubtitleTrackId?.ToString() ?? "")" @onchange="SetSubtitlesAsync">
+                    <option value="">Subtitles off</option>
+                    @foreach (var track in state.SubtitleTracks)
+                    {
+                        <option value="@track.Id">@track.Label()</option>
+                    }
+                </select>
+            </div>
+
+            <div class="volume">
+                <svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z" /></svg>
+                <input type="range" min="0" max="100" step="1" value="@(_volume ?? state.Volume)" aria-label="Volume"
+                       @oninput="e => _volume = (int?)Parse(e.Value)" @onchange="CommitVolumeAsync" />
+            </div>
+        }
+    }
+</footer>
+
+@code {
+    // Collapsed, the bar leaves the screen to the library.
+    private bool _expanded;
+
+    // Values being dragged; polling must not move the slider under the finger.
+    private double? _seeking;
+    private int? _volume;
+
+    protected override void OnInitialized() => Watch(Player);
+
+    private async Task CommitSeekAsync(ChangeEventArgs e)
+    {
+        if (Parse(e.Value) is { } position)
+            await Player.SeekToAsync(position);
+        _seeking = null;
+    }
+
+    private async Task CommitVolumeAsync(ChangeEventArgs e)
+    {
+        if (Parse(e.Value) is { } volume)
+            await Player.SetVolumeAsync((int)volume);
+        _volume = null;
+    }
+
+    private Task SetAudioAsync(ChangeEventArgs e) =>
+        int.TryParse(e.Value as string, out var id) ? Player.SetAudioTrackAsync(id) : Task.CompletedTask;
+
+    private Task SetSubtitlesAsync(ChangeEventArgs e) =>
+        Player.SetSubtitleTrackAsync(int.TryParse(e.Value as string, out var id) ? id : null);
+
+    private static double? Parse(object? value) =>
+        double.TryParse(value as string, System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var number)
+            ? number
+            : null;
+
+    private static long Whole(double seconds) => (long)Math.Floor(seconds);
+
+    // A range needs a positive maximum even before the duration is known.
+    private static long Max(double duration) => Math.Max(1, Whole(duration));
+}

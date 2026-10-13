@@ -1,0 +1,35 @@
+@implements IDisposable
+@inject Notifications Notifications
+
+@if (Notifications.Message is { } message)
+{
+    <div class="toast" role="alert" @onclick="Notifications.Dismiss">@message</div>
+}
+
+@code {
+    private CancellationTokenSource? _hide;
+
+    protected override void OnInitialized() => Notifications.Changed += OnChanged;
+
+    private void OnChanged()
+    {
+        _hide?.Cancel();
+        if (Notifications.Message is not null)
+            _ = HideLaterAsync((_hide = new()).Token);
+        _ = InvokeAsync(StateHasChanged);
+    }
+
+    private async Task HideLaterAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(4), cancellationToken);
+            Notifications.Dismiss();
+        }
+        catch (TaskCanceledException)
+        {
+        }
+    }
+
+    public void Dispose() => Notifications.Changed -= OnChanged;
+}

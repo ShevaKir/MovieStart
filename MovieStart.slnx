@@ -8,5 +8,7 @@
     <Project Path="tests/MovieStart.Client.Tests/MovieStart.Client.Tests.csproj" />
     <Project Path="tests/MovieStart.Desktop.Tests/MovieStart.Desktop.Tests.csproj" />
     <Project Path="tests/MovieStart.Shared.Tests/MovieStart.Shared.Tests.csproj" />
+    <Project Path="tests/MovieStart.Web.Tests/MovieStart.Web.Tests.csproj" />
   </Folder>
+  <Project Path="MovieStart.Web/MovieStart.Web.csproj" />
 </Solution>

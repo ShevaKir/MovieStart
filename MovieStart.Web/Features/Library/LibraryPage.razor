@@ -1,0 +1,35 @@
+@page "/"
+@inherits StoreComponent
+@inject LibraryStore Library
+
+<PageTitle>Library · MovieStart</PageTitle>
+
+<div class="heading">
+    <h1>Library</h1>
+    @if (Library.Storage is { } storage)
+    {
+        <span class="muted">@Format.Size(storage.FreeBytes) free</span>
+    }
+</div>
+
+@if (!Library.IsLoaded)
+{
+    <p class="empty muted">Loading…</p>
+}
+else if (Library.Items.Count == 0)
+{
+    <p class="empty muted">@(Library.IsOnline ? "Nothing in the library yet. Add movies from the Mac app." : "The Pi is not reachable.")</p>
+}
+else
+{
+    <ul class="items">
+        @foreach (var item in Library.Items)
+        {
+            <li @key="item.Id"><LibraryCard Item="item" /></li>
+        }
+    </ul>
+}
+
+@code {
+    protected override void OnInitialized() => Watch(Library);
+}

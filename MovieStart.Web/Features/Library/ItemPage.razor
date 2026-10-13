@@ -1,0 +1,86 @@
+@page "/items/{Id:guid}"
+@inherits StoreComponent
+@inject LibraryStore Library
+@inject PlayerStore Player
+@inject NavigationManager Navigation
+
+<a class="back" href="">
+    <svg viewBox="0 0 24 24"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z" /></svg>
+    Library
+</a>
+
+@if (Library.Find(Id) is not { } item)
+{
+    <p class="empty muted">@(Library.IsLoaded ? "This title is no longer in the library." : "Loading…")</p>
+}
+else
+{
+    <PageTitle>@item.Title · MovieStart</PageTitle>
+
+    <section class="hero">
+        <Poster Item="item" Size="large" />
+        <div class="text">
+            <h1>@item.Title</h1>
+            @if (item.OriginalTitle is { } original && original != item.Title)
+            {
+                <span class="muted">@original</span>
+            }
+            <span class="muted">@item.Summary()</span>
+            @if (item.DownloadStatusText() is { } downloading)
+            {
+                <span class="downloading">@downloading</span>
+            }
+        </div>
+    </section>
+
+    @if (item.Files.Count > 0)
+    {
+        <div class="actions">
+            <button class="accent" @onclick="() => Library.PlayAsync(item.Id, new PlayItemRequest())">
+                <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                @item.PlayLabel()
+            </button>
+            @if (item.CanStartOver() && item.ChooseFileToContinue() is { } next)
+            {
+                <button @onclick="() => Library.PlayAsync(item.Id, new PlayItemRequest(next.Id, FromStart: true))">Start over</button>
+            }
+        </div>
+    }
+
+    @if (item.Kind == MediaKind.Series && item.Files.Count > 0)
+    {
+        @foreach (var season in item.Files.GroupBy(file => file.Season))
+        {
+            <h2>@(season.Key is { } number ? $"Season {number}" : "Other files")</h2>
+            <ul class="episodes">
+                @foreach (var file in season)
+                {
+                    <li @key="file.Id">
+                        <EpisodeRow ItemId="item.Id" File="file" IsOnTv="IsOnTv(file)" />
+                    </li>
+                }
+            </ul>
+        }
+    }
+
+    <div class="danger-zone">
+        <ConfirmButton Label="Delete from the Pi" Question="@($"Delete {item.Title} and all its files?")" OnConfirm="() => DeleteAsync(item)" />
+    </div>
+}
+
+@code {
+    [Parameter]
+    public Guid Id { get; set; }
+
+    protected override void OnInitialized() => Watch(Library, Player);
+
+    private bool IsOnTv(MediaFile file) =>
+        Player.HasMedia && Player.State.FilePath?.EndsWith("/" + file.Name, StringComparison.Ordinal) == true;
+
+    private async Task DeleteAsync(LibraryItem item)
+    {
+        await Library.DeleteItemAsync(item.Id);
+        if (Library.Find(item.Id) is null)
+            Navigation.NavigateTo("");
+    }
+}

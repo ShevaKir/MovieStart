@@ -1,0 +1,41 @@
+@inject LibraryStore Library
+
+<div class="row @(IsOnTv ? "on-tv" : null) @(File.Watched ? "watched" : null)">
+    <button class="main" @onclick="() => Library.PlayAsync(ItemId, new PlayItemRequest(File.Id))">
+        <span class="code">@(File.EpisodeCode ?? "—")</span>
+        <span class="text">
+            <span class="name">@System.IO.Path.GetFileNameWithoutExtension(File.Name)</span>
+            <span class="meta">@Meta</span>
+        </span>
+        <span class="progress"><span style="width: @(WatchedPercent.ToString("0.#", System.Globalization.CultureInfo.InvariantCulture))%"></span></span>
+    </button>
+    <div class="tools">
+        @if (File is { Watched: false, Position: > 0 })
+        {
+            <button class="ghost" @onclick="() => Library.PlayAsync(ItemId, new PlayItemRequest(File.Id, FromStart: true))">From start</button>
+        }
+        <ConfirmButton Label="Delete" Question="@($"Delete {File.EpisodeCode ?? "this file"} from the Pi?")"
+                       OnConfirm="() => Library.DeleteFileAsync(ItemId, File.Id)" />
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public Guid ItemId { get; set; }
+
+    [Parameter, EditorRequired]
+    public MediaFile File { get; set; } = null!;
+
+    [Parameter]
+    public bool IsOnTv { get; set; }
+
+    private double WatchedPercent => File.Watched ? 100 : File.Duration > 0 ? File.Position / File.Duration * 100 : 0;
+
+    private string Meta => IsOnTv ? "On TV" : File switch
+    {
+        { Watched: true } => "Watched",
+        { Position: > 0, Duration: > 0 } => $"{Format.Duration(File.Duration - File.Position)} left",
+        { Duration: > 0 } => Format.Duration(File.Duration),
+        _ => Format.Size(File.SizeBytes),
+    };
+}

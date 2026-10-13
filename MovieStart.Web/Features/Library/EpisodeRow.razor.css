@@ -1,0 +1,29 @@
+.row { padding: 10px 12px; }
+
+.main {
+    width: 100%;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 2px 12px;
+    padding: 0;
+    border: 0;
+    background: none;
+    text-align: left;
+    color: inherit;
+    font: inherit;
+}
+
+.code { font-weight: 600; font-variant-numeric: tabular-nums; }
+.text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.meta { font-size: 13px; color: var(--muted); }
+
+.progress { grid-column: 1 / -1; height: 3px; margin-top: 6px; border-radius: 2px; background: var(--line); overflow: hidden; }
+.progress span { display: block; height: 100%; background: var(--accent); }
+
+.watched .name, .watched .code { color: var(--muted); }
+.on-tv { background: var(--accent-soft); }
+.on-tv .meta { color: var(--accent); font-weight: 600; }
+
+.tools { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 4px; margin: 2px -8px -6px 0; }
+.tools ::deep button { min-height: 32px; padding: 4px 8px; font-size: 13px; }

@@ -63,11 +63,17 @@ var app = builder.Build();
 var version = Assembly.GetExecutingAssembly()
     .GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion.Split('+')[0] ?? "unknown";
 
+// The web app (MovieStart.Web) lives at the root; unknown paths open it so its own routes work on reload.
+app.MapStaticAssets();
+
 app.MapGet(ApiRoutes.Health, () => new HealthResponse(version, DateTimeOffset.UtcNow));
 app.MapPlayerEndpoints();
 app.MapLibraryEndpoints();
 app.MapSearchEndpoints();
 app.MapProfileEndpoints();
+
+app.MapFallback("/api/{**path}", () => Results.NotFound());
+app.MapFallbackToFile("index.html");
 
 app.Run();
 
