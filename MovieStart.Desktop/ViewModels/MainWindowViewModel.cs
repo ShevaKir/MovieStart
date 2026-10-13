@@ -37,16 +37,8 @@ public partial class MainWindowViewModel : ObservableObject
 
     public VoiceProfileViewModel VoiceProfile { get; }
 
-    /// <summary>The agent runs with simulated downloads and player; shows the Demo menu.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(StatusText))]
-    private bool _isDemo;
-
-    [ObservableProperty]
-    private string? _demoStatus;
-
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsSearchSection), nameof(IsLibrarySection), nameof(IsSettingsSection), nameof(IsDemoSection))]
+    [NotifyPropertyChangedFor(nameof(IsSearchSection), nameof(IsLibrarySection), nameof(IsSettingsSection))]
     private Section _currentSection = Section.Library;
 
     public bool IsSearchSection => CurrentSection == Section.Search;
@@ -54,8 +46,6 @@ public partial class MainWindowViewModel : ObservableObject
     public bool IsLibrarySection => CurrentSection == Section.Library;
 
     public bool IsSettingsSection => CurrentSection == Section.Settings;
-
-    public bool IsDemoSection => CurrentSection == Section.Demo;
 
     [RelayCommand]
     private void ShowSearch() => CurrentSection = Section.Search;
@@ -70,31 +60,13 @@ public partial class MainWindowViewModel : ObservableObject
         await VoiceProfile.LoadAsync();
     }
 
-    [RelayCommand]
-    private void ShowDemo() => CurrentSection = Section.Demo;
-
-    [RelayCommand]
-    private async Task CompleteDemoDownloadsAsync()
-    {
-        var result = await _agentClient.CompleteDemoDownloadsAsync(AgentUrl);
-        DemoStatus = result.Error ?? "All demo downloads are finishing; they appear in the library in a few seconds.";
-    }
-
-    [RelayCommand]
-    private async Task ResetDemoAsync()
-    {
-        var result = await _agentClient.ResetDemoAsync(AgentUrl);
-        DemoStatus = result.Error ?? "Demo library cleared.";
-        await Library.RefreshAsync();
-    }
-
     public bool IsOnline => Status == ConnectionStatus.Online;
 
     public bool IsOffline => Status == ConnectionStatus.Offline;
 
     public string StatusText => Status switch
     {
-        ConnectionStatus.Online => IsDemo ? $"Demo · agent {AgentVersion}" : $"Online · agent {AgentVersion}",
+        ConnectionStatus.Online => $"Online · agent {AgentVersion}",
         ConnectionStatus.Offline => "Offline",
         _ => "Checking…",
     };
@@ -104,7 +76,6 @@ public partial class MainWindowViewModel : ObservableObject
     {
         var health = await _agentClient.GetHealthAsync(AgentUrl, cancellationToken);
         AgentVersion = health?.Version;
-        IsDemo = health?.IsDemo ?? false;
         Status = health is null ? ConnectionStatus.Offline : ConnectionStatus.Online;
     }
 
@@ -124,5 +95,4 @@ public enum Section
     Search,
     Library,
     Settings,
-    Demo,
 }

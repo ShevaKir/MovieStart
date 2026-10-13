@@ -123,6 +123,36 @@
                               </StackPanel>
                             </Grid>
                           </Border>
+                          <StackPanel Spacing="8" IsVisible="{Binding CanPickEpisodes}">
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                              <TextBlock Text="{Binding ChoiceSummary}" FontSize="13" VerticalAlignment="Center" />
+                              <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="12">
+                                <Button Classes="link" Content="All" Command="{Binding ChooseAllEpisodesCommand}" />
+                                <Button Classes="link" Content="None" Command="{Binding ChooseNoEpisodesCommand}" />
+                              </StackPanel>
+                            </Grid>
+                            <ItemsControl ItemsSource="{Binding Episodes}">
+                              <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                  <WrapPanel />
+                                </ItemsPanelTemplate>
+                              </ItemsControl.ItemsPanel>
+                              <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:DownloadFileViewModel">
+                                  <CheckBox IsChecked="{Binding IsWanted}" MinWidth="170" Margin="0,0,12,0">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                      <TextBlock Text="{Binding Label}" FontSize="13" />
+                                      <TextBlock Classes="muted" FontSize="12" Text="{Binding Size}" VerticalAlignment="Center" />
+                                    </StackPanel>
+                                  </CheckBox>
+                                </DataTemplate>
+                              </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                            <TextBlock Text="More than the free space on the Pi" Foreground="#9A5B00" FontSize="12"
+                                       IsVisible="{Binding ChoiceExceedsFreeSpace}" />
+                            <Button Classes="accent" HorizontalAlignment="Left" Content="Download chosen episodes"
+                                    Command="{Binding StartCommand}" IsEnabled="{Binding CanStart}" />
+                          </StackPanel>
                           <StackPanel Spacing="6" IsVisible="{Binding CanChooseEpisodes}">
                             <Button Classes="link" Command="{Binding ToggleEpisodeChoiceCommand}" HorizontalAlignment="Left">
                               <StackPanel Orientation="Horizontal" Spacing="6">

@@ -48,7 +48,15 @@ public partial class ReleaseRowViewModel(ReleasesViewModel releases, ReleaseInfo
 
     public string? Warning => Release.Warnings.Count > 0 ? string.Join(" ", Release.Warnings) : null;
 
-    public string DownloadLabel => IsAdded ? "Added" : "Download to Pi";
+    public string DownloadLabel => (IsAdded, ChoosesEpisodes) switch
+    {
+        (false, _) => "Download to Pi",
+        (true, true) => "Added · choose episodes in Library",
+        (true, false) => "Added",
+    };
+
+    /// <summary>A season or whole series waits on the Pi until its episodes are chosen.</summary>
+    private bool ChoosesEpisodes => releases.IsSeries && Release.Episode is null;
 
     public void Highlight(Func<ReleaseAudio, bool> isPreferred) =>
         Audio = Release.Audio.Select(track => new AudioChip(Describe(track), isPreferred(track))).ToList();

@@ -165,6 +165,18 @@ public class SearchViewModelTests
     }
 
     [Fact]
+    public async Task AddedSeasonPointsToTheEpisodeChoice()
+    {
+        _agent.Releases = [Release("Shogun.S01", 1)];
+        var releases = await OpenAsync(Shogun);
+        var row = releases.Releases[0];
+
+        await row.DownloadCommand.ExecuteAsync(null);
+
+        Assert.Equal("Added · choose episodes in Library", row.DownloadLabel);
+    }
+
+    [Fact]
     public async Task ShowsAgentErrors()
     {
         _agent.Result = AgentResult.Failure("Prowlarr is not configured: set Prowlarr:ApiKey.");

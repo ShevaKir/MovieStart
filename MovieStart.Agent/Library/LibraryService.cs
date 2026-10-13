@@ -100,10 +100,13 @@ public sealed class LibraryService(
         if (request.Kind == MediaKind.Movie && (request.Season is not null || request.Episode is not null))
             throw new ArgumentException("A movie has no season or episode.");
 
+        // A season or a whole series waits for the viewer to choose episodes; space is checked against that choice.
+        var choosesFiles = request.Kind == MediaKind.Series && request.Episode is null;
+
         await _gate.WaitAsync(cancellationToken);
         try
         {
-            if (request.SizeBytes is > 0 and var size)
+            if (!choosesFiles && request.SizeBytes is > 0 and var size)
                 EnsureSpaceFor(size);
 
             var now = time.GetUtcNow();
@@ -125,7 +128,7 @@ public sealed class LibraryService(
                 ReleaseTitle = request.ReleaseTitle,
                 Season = request.Season,
                 Episode = request.Episode,
-                Status = DownloadStatus.Queued,
+                Status = choosesFiles ? DownloadStatus.ChoosingFiles : DownloadStatus.Queued,
                 SizeBytes = request.SizeBytes ?? 0,
                 AddedAt = now,
             };
@@ -135,7 +138,7 @@ public sealed class LibraryService(
             await store.SaveAsync(item, cancellationToken);
             try
             {
-                await qbit.AddAsync(request.Source, store.GetDownloadDirectory(item.Id, download.Id), TagFor(download.Id), cancellationToken);
+                await qbit.AddAsync(request.Source, store.GetDownloadDirectory(item.Id, download.Id), TagFor(download.Id), choosesFiles, cancellationToken);
             }
             catch
             {
@@ -180,8 +183,9 @@ public sealed class LibraryService(
     }
 
     /// <summary>
-    /// Chooses the files of a download; qBittorrent skips the rest. Choosing more files of a finished download
-    /// (the next episodes of a season) starts it again; the episodes already on the Pi stay.
+    /// Chooses the files of a download; qBittorrent skips the rest. The first choice of a season starts it. Choosing
+    /// more files of a finished download (the next episodes of a season) starts it again; the episodes already on
+    /// the Pi stay.
     /// </summary>
     public async Task SelectFilesAsync(Guid itemId, Guid downloadId, SelectFilesRequest request, CancellationToken cancellationToken)
     {
@@ -201,6 +205,9 @@ public sealed class LibraryService(
 
             var dropped = download.Files.Where(file => file.Wanted && !wanted.Contains(file.Index)).ToList();
             var restored = download.Files.Where(file => !file.Wanted && wanted.Contains(file.Index)).ToList();
+            var starting = download.Status == DownloadStatus.ChoosingFiles;
+            var wantedSize = download.Files.Where(file => wanted.Contains(file.Index)).Sum(file => file.SizeBytes);
+            EnsureSpaceFor(starting ? wantedSize : restored.Sum(file => file.SizeBytes));
             var directory = store.GetDownloadDirectory(itemId, downloadId);
 
             // What qBittorrent counts as done of the files chosen again, read before they are chosen.
@@ -227,7 +234,15 @@ public sealed class LibraryService(
 
             var files = download.Files.Select(file => file with { Wanted = wanted.Contains(file.Index) }).ToList();
             download = download with { Files = files };
-            if (download.Status == DownloadStatus.Ready && restored.Count > 0)
+            if (starting)
+            {
+                await qbit.ResumeAsync(hash, cancellationToken);
+                download = download with { Status = DownloadStatus.Queued, Progress = 0, SizeBytes = wantedSize };
+                logger.LogInformation(
+                    "{Title}: fetching {Count} episode(s) of {Release}",
+                    item.Title, download.Files.Count(file => file.IsVideo && wanted.Contains(file.Index)), download.ReleaseTitle);
+            }
+            else if (download.Status == DownloadStatus.Ready && restored.Count > 0)
             {
                 // The torrent was stopped when it finished; sync takes it from here until the new files are in.
                 await qbit.ResumeAsync(hash, cancellationToken);
@@ -235,7 +250,7 @@ public sealed class LibraryService(
                 {
                     Status = DownloadStatus.Queued,
                     Progress = 0,
-                    SizeBytes = files.Where(file => file.Wanted).Sum(file => file.SizeBytes),
+                    SizeBytes = wantedSize,
                 };
                 logger.LogInformation("{Title}: fetching {Count} more file(s) of {Release}", item.Title, restored.Count, download.ReleaseTitle);
             }
@@ -400,8 +415,12 @@ public sealed class LibraryService(
         {
             var torrent = FindTorrent(torrents, download.Id);
             var (updated, completed) = Track(download, torrent);
-            if (updated.Files is null && torrent is not null && updated.Status != DownloadStatus.Queued)
+            if (updated.Files is null && torrent is not null && MapStatus(torrent) != DownloadStatus.Queued)
                 updated = updated with { Files = await ReadFilesAsync(kind, updated.Season, torrent.Hash, cancellationToken) };
+            // qBittorrent stops it once the metadata is in; should it run anyway, nothing is fetched before the choice.
+            if (updated.Status == DownloadStatus.ChoosingFiles && torrent is not null && MapStatus(torrent) == DownloadStatus.Downloading
+                && !torrent.State.StartsWith("checking", StringComparison.Ordinal))
+                await qbit.PauseAsync(torrent.Hash, cancellationToken);
             IReadOnlyList<QbitFile>? files = null;
             if (completed && _rechecks.TryGetValue(download.Id, out var requestedAt) && time.GetUtcNow() - requestedAt < RecheckGracePeriod)
                 completed = false;
@@ -535,6 +554,15 @@ public sealed class LibraryService(
             if (time.GetUtcNow() - download.AddedAt < AddGracePeriod)
                 return (download, false);
             return (download with { Status = DownloadStatus.Error, Error = "The torrent was removed from qBittorrent." }, false);
+        }
+
+        if (download.Status == DownloadStatus.ChoosingFiles && MapStatus(torrent) != DownloadStatus.Error)
+        {
+            return (download with
+            {
+                TorrentHash = torrent.Hash,
+                SizeBytes = torrent.Size > 0 ? torrent.Size : download.SizeBytes,
+            }, false);
         }
 
         // While qBittorrent re-hashes the data, "progress" is how far the check got, not the download.
@@ -722,8 +750,9 @@ public sealed class LibraryService(
     private static QbitTorrent? FindTorrent(IReadOnlyList<QbitTorrent> torrents, Guid downloadId) =>
         torrents.FirstOrDefault(torrent => torrent.HasTag(TagFor(downloadId)));
 
+    /// <summary>Downloads the sync follows in qBittorrent.</summary>
     private static bool IsActive(LibraryDownload download) =>
-        download.Status is DownloadStatus.Queued or DownloadStatus.Downloading or DownloadStatus.Paused;
+        download.Status is DownloadStatus.Queued or DownloadStatus.ChoosingFiles or DownloadStatus.Downloading or DownloadStatus.Paused;
 
     // Download progress, speed and ETA are not worth a disk write on their own.
     private static bool PersistentStateChanged(LibraryItem before, LibraryItem after)
@@ -743,10 +772,10 @@ public sealed class LibraryService(
 
     private void EnsureSpaceFor(long sizeBytes)
     {
-        // Downloads already running will still take the rest of their size.
+        // Downloads already running will still take the rest of their size; one still being chosen takes nothing yet.
         var pending = _items.Values
             .SelectMany(item => item.Downloads)
-            .Where(IsActive)
+            .Where(download => IsActive(download) && download.Status != DownloadStatus.ChoosingFiles)
             .Sum(download => (long)(download.SizeBytes * (1 - download.Progress)));
         var available = Math.Max(0, GetStorage().FreeBytes - pending - ReserveBytes);
         if (sizeBytes > available)
@@ -781,6 +810,8 @@ public sealed class LibraryService(
     private string RequireActiveHash(Guid itemId, Guid downloadId)
     {
         var download = GetDownload(Get(itemId), downloadId);
+        if (download.Status == DownloadStatus.ChoosingFiles)
+            throw new LibraryStateException("Choose the episodes to start the download.");
         if (!IsActive(download) || download.TorrentHash is null)
             throw new LibraryStateException("The download is not in progress.");
         return download.TorrentHash;

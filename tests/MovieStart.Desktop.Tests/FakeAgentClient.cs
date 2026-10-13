@@ -117,12 +117,6 @@ public sealed class FakeAgentClient : IAgentClient
         return Record("save profile");
     }
 
-    public Task<AgentResult> CompleteDemoDownloadsAsync(string agentUrl, CancellationToken cancellationToken = default) =>
-        Record("demo complete");
-
-    public Task<AgentResult> ResetDemoAsync(string agentUrl, CancellationToken cancellationToken = default) =>
-        Record("demo reset");
-
     private Task<AgentResult> Record(string call)
     {
         Calls.Add(call);

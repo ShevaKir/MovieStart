@@ -126,6 +126,116 @@ public sealed class LibraryServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task SeasonWaitsForTheEpisodesToBeChosen()
+    {
+        _storage.Free = 40 * Gb;
+
+        var item = await _library.AddAsync(Series(season: 1) with { SizeBytes = 44 * Gb }, Token);
+
+        var download = Assert.Single(item.Downloads);
+        Assert.Equal(DownloadStatus.ChoosingFiles, download.Status);
+        Assert.Equal([LibraryService.TagFor(download.Id)], _qbit.StoppedWithMetadata);
+
+        _qbit.Appear("h1", state: "stoppedDL");
+        _qbit.Files["h1"] = SeasonFiles();
+        await _library.SyncAsync(Token);
+
+        download = _library.List()[0].Downloads[0];
+        Assert.Equal(DownloadStatus.ChoosingFiles, download.Status);
+        Assert.Equal([true, true, true, false], download.Files!.Select(file => file.Wanted));
+        Assert.Empty(_qbit.Resumed);
+        Assert.Empty(_qbit.Paused);
+    }
+
+    [Fact]
+    public async Task SingleEpisodeStartsRightAway()
+    {
+        var item = await _library.AddAsync(Series(season: 1, episode: 2), Token);
+
+        Assert.Equal(DownloadStatus.Queued, item.Downloads[0].Status);
+        Assert.Empty(_qbit.StoppedWithMetadata);
+    }
+
+    [Fact]
+    public async Task ChoosingEpisodesStartsTheSeason()
+    {
+        _storage.Free = 7 * Gb;
+        var series = await AddSeasonToChooseAsync();
+
+        // 7 free − 2 reserve = 5 available; two episodes take 4.
+        await _library.SelectFilesAsync(series.Id, series.Downloads[0].Id, new SelectFilesRequest([0, 2]), Token);
+
+        var download = _library.List()[0].Downloads[0];
+        Assert.Equal(DownloadStatus.Queued, download.Status);
+        Assert.Equal(4 * Gb, download.SizeBytes);
+        Assert.Equal(["h1"], _qbit.Resumed);
+        Assert.Equal([true, false, true, false], _qbit.Files["h1"].Select(file => file.IsWanted));
+
+        _qbit.Update("h1", torrent => torrent with { State = "downloading", Progress = 0.2 });
+        await _library.SyncAsync(Token);
+        Assert.Equal(DownloadStatus.Downloading, _library.List()[0].Downloads[0].Status);
+    }
+
+    [Fact]
+    public async Task EpisodesThatDoNotFitAreRefused()
+    {
+        _storage.Free = 7 * Gb;
+        var series = await AddSeasonToChooseAsync();
+
+        await Assert.ThrowsAsync<InsufficientStorageException>(
+            () => _library.SelectFilesAsync(series.Id, series.Downloads[0].Id, new SelectFilesRequest([0, 1, 2]), Token));
+
+        Assert.Equal(DownloadStatus.ChoosingFiles, _library.List()[0].Downloads[0].Status);
+        Assert.Empty(_qbit.Resumed);
+        Assert.Equal(["h1:3=0"], _qbit.PriorityChanges);
+    }
+
+    [Fact]
+    public async Task SeasonBeingChosenTakesNoSpaceFromOtherDownloads()
+    {
+        _storage.Free = 20 * Gb;
+        await AddSeasonToChooseAsync();
+
+        await _library.AddAsync(Movie(size: 17 * Gb), Token);
+    }
+
+    [Fact]
+    public async Task SeasonBeingChosenCannotBeResumed()
+    {
+        var series = await AddSeasonToChooseAsync();
+
+        await Assert.ThrowsAsync<LibraryStateException>(
+            () => _library.ResumeDownloadAsync(series.Id, series.Downloads[0].Id, Token));
+        Assert.Empty(_qbit.Resumed);
+    }
+
+    [Fact]
+    public async Task SeasonThatRunsBeforeTheChoiceIsStopped()
+    {
+        await _library.AddAsync(Series(season: 1), Token);
+        _qbit.Appear("h1", state: "downloading");
+        _qbit.Files["h1"] = SeasonFiles();
+
+        await _library.SyncAsync(Token);
+
+        Assert.Equal(["h1"], _qbit.Paused);
+        Assert.Equal(DownloadStatus.ChoosingFiles, _library.List()[0].Downloads[0].Status);
+    }
+
+    [Fact]
+    public async Task MoreEpisodesThanFitAreNotFetchedLater()
+    {
+        var series = await AddFinishedSeasonWithFirstEpisodeAsync();
+        // 5 free − 2 reserve = 3 available; two more episodes take 4.
+        _storage.Free = 5 * Gb;
+
+        await Assert.ThrowsAsync<InsufficientStorageException>(
+            () => _library.SelectFilesAsync(series.Id, series.Downloads[0].Id, new SelectFilesRequest([0, 1, 2]), Token));
+
+        Assert.Empty(_qbit.Resumed);
+    }
+
+    [Fact]
     public async Task SyncTracksProgress()
     {
         var item = await _library.AddAsync(Movie(), Token);
@@ -180,16 +290,17 @@ public sealed class LibraryServiceTests : IDisposable
     public async Task CompletedSeasonListsEpisodesInWatchOrder()
     {
         await _library.AddAsync(Series(season: 1), Token);
-        _qbit.Appear("h1", progress: 1, state: "stalledUP");
-        _qbit.Files["h1"] =
-        [
-            new QbitFile { Name = "Shogun.S01/Shogun.S01E02.mkv", Size = 2 * Gb },
-            new QbitFile { Name = "Shogun.S01/Shogun.S01E10.mkv", Size = 2 * Gb },
-            new QbitFile { Name = "Shogun.S01/Shogun.S01E01.mkv", Size = 2 * Gb },
-            new QbitFile { Name = "Shogun.S01/Shogun.S01E01.sample.mkv", Size = 40_000_000 },
-        ];
 
-        await _library.SyncAsync(Token);
+        await StartSeasonAsync(
+            "h1",
+            [
+                new QbitFile { Name = "Shogun.S01/Shogun.S01E02.mkv", Size = 2 * Gb },
+                new QbitFile { Name = "Shogun.S01/Shogun.S01E10.mkv", Size = 2 * Gb },
+                new QbitFile { Name = "Shogun.S01/Shogun.S01E01.mkv", Size = 2 * Gb },
+                new QbitFile { Name = "Shogun.S01/Shogun.S01E01.sample.mkv", Size = 40_000_000 },
+            ],
+            state: "stalledUP",
+            progress: 1);
 
         var series = Assert.Single(_library.List());
         Assert.Equal(["S01E01", "S01E02", "S01E10"], series.Files.Select(f => f.EpisodeCode));
@@ -205,9 +316,8 @@ public sealed class LibraryServiceTests : IDisposable
         await _library.SyncAsync(Token);
 
         await _library.AddAsync(Series(season: 1), Token);
-        _qbit.Appear("h1", progress: 1, state: "uploading");
-        _qbit.Files["h1"] = [new QbitFile { Name = "S01E01.mkv", Size = 2 * Gb }, new QbitFile { Name = "S01E02.mkv", Size = 2 * Gb }];
-        await _library.SyncAsync(Token);
+        await StartSeasonAsync(
+            "h1", [new QbitFile { Name = "S01E01.mkv", Size = 2 * Gb }, new QbitFile { Name = "S01E02.mkv", Size = 2 * Gb }], "uploading", 1);
 
         var series = Assert.Single(_library.List());
         // The single-episode release gets its numbers from the request when the file name has none.
@@ -743,7 +853,35 @@ public sealed class LibraryServiceTests : IDisposable
     private async Task<LibraryItem> AddRunningSeasonAsync()
     {
         await _library.AddAsync(Series(season: 1), Token);
-        _qbit.Appear("h1", progress: 0.1);
+        return await StartSeasonAsync("h1", SeasonFiles());
+    }
+
+    /// <summary>Lets the file list of the season added last arrive and starts it with every episode chosen.</summary>
+    private async Task<LibraryItem> StartSeasonAsync(string hash, List<QbitFile> files, string state = "downloading", double progress = 0.1)
+    {
+        _qbit.Appear(hash, state: "stoppedDL");
+        _qbit.Files[hash] = files;
+        await _library.SyncAsync(Token);
+        var series = _library.List().Single();
+        var download = series.Downloads.Single(d => d.TorrentHash == hash);
+        var wanted = download.Files!.Where(file => file.Wanted).Select(file => file.Index).ToList();
+        await _library.SelectFilesAsync(series.Id, download.Id, new SelectFilesRequest(wanted), Token);
+
+        _qbit.Update(hash, torrent => torrent with { State = state, Progress = progress });
+        await _library.SyncAsync(Token);
+
+        // Tests look only at what happens after the start.
+        _qbit.PriorityChanges.Clear();
+        _qbit.Resumed.Clear();
+        _qbit.Paused.Clear();
+        return _library.List().Single();
+    }
+
+    /// <summary>A season whose file list has arrived and waits for the episodes to be chosen.</summary>
+    private async Task<LibraryItem> AddSeasonToChooseAsync()
+    {
+        await _library.AddAsync(Series(season: 1), Token);
+        _qbit.Appear("h1", state: "stoppedDL");
         _qbit.Files["h1"] = SeasonFiles();
         await _library.SyncAsync(Token);
         return _library.List().Single();
@@ -763,10 +901,8 @@ public sealed class LibraryServiceTests : IDisposable
     private async Task<LibraryItem> AddReadySeasonAsync()
     {
         await _library.AddAsync(Series(season: 1), Token);
-        _qbit.Appear("h1", progress: 1, state: "uploading");
-        _qbit.Files["h1"] = [.. Enumerable.Range(1, 3).Select(e => new QbitFile { Name = $"S01E0{e}.mkv", Size = 2 * Gb })];
-        await _library.SyncAsync(Token);
-        return _library.List().Single();
+        return await StartSeasonAsync(
+            "h1", [.. Enumerable.Range(1, 3).Select(e => new QbitFile { Name = $"S01E0{e}.mkv", Size = 2 * Gb })], "uploading", 1);
     }
 
     private string PathOf(LibraryItem item, MediaFile file) => Path.Combine(_store.GetItemDirectory(item.Id), file.Name);

@@ -8,7 +8,8 @@ public interface IQbitClient
 {
     /// <param name="source">Magnet link or .torrent URL.</param>
     /// <param name="tag">Tag used to find the torrent later; qBittorrent does not return the hash on add.</param>
-    Task AddAsync(string source, string savePath, string tag, CancellationToken cancellationToken);
+    /// <param name="stopWithMetadata">Stop the torrent as soon as its file list is known, before any data is fetched.</param>
+    Task AddAsync(string source, string savePath, string tag, bool stopWithMetadata, CancellationToken cancellationToken);
 
     Task<IReadOnlyList<QbitTorrent>> GetTorrentsAsync(CancellationToken cancellationToken);
 
@@ -37,9 +38,12 @@ public sealed class QbitClient(HttpClient http, IOptions<QbitOptions> options) :
 
     private readonly SemaphoreSlim _loginLock = new(1, 1);
 
-    public Task AddAsync(string source, string savePath, string tag, CancellationToken cancellationToken) =>
-        PostAsync("torrents/add", cancellationToken,
-            ("urls", source), ("savepath", savePath), ("tags", tag));
+    public Task AddAsync(string source, string savePath, string tag, bool stopWithMetadata, CancellationToken cancellationToken) =>
+        stopWithMetadata
+            ? PostAsync("torrents/add", cancellationToken,
+                ("urls", source), ("savepath", savePath), ("tags", tag), ("stopCondition", "MetadataReceived"))
+            : PostAsync("torrents/add", cancellationToken,
+                ("urls", source), ("savepath", savePath), ("tags", tag));
 
     public async Task<IReadOnlyList<QbitTorrent>> GetTorrentsAsync(CancellationToken cancellationToken)
     {

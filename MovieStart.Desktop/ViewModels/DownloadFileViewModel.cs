@@ -20,13 +20,15 @@ public partial class DownloadFileViewModel(DownloadViewModel download, DownloadF
 
     public string Size => Format.Size(File.SizeBytes);
 
-    public void Update(DownloadFile file)
+    /// <param name="keepTick">The viewer is still choosing; the tick has not been sent yet.</param>
+    public void Update(DownloadFile file, bool keepTick = false)
     {
         _applying = true;
         try
         {
             File = file;
-            IsWanted = file.Wanted;
+            if (!keepTick)
+                IsWanted = file.Wanted;
             OnPropertyChanged(string.Empty);
         }
         finally
@@ -38,6 +40,6 @@ public partial class DownloadFileViewModel(DownloadViewModel download, DownloadF
     partial void OnIsWantedChanged(bool value)
     {
         if (!_applying)
-            _ = download.SendSelectionAsync();
+            download.OnEpisodeTicked();
     }
 }

@@ -50,14 +50,6 @@
               </Grid>
             </Button>
             <Button Classes="nav" Classes.selected="{Binding IsSettingsSection}" Command="{Binding ShowSettingsCommand}" Content="Settings" />
-            <Button Classes="nav" Classes.selected="{Binding IsDemoSection}" Command="{Binding ShowDemoCommand}" IsVisible="{Binding IsDemo}">
-              <Grid ColumnDefinitions="*,Auto">
-                <TextBlock Text="Demo" />
-                <Border Grid.Column="1" Classes="tag" Background="#FCEFD9" VerticalAlignment="Center">
-                  <TextBlock Text="test" FontSize="11" Foreground="#9A5B00" />
-                </Border>
-              </Grid>
-            </Button>
           </StackPanel>
         </StackPanel>
       </DockPanel>
@@ -73,7 +65,6 @@
         <views:LibraryView DataContext="{Binding Library}" />
       </Panel>
       <views:SettingsView IsVisible="{Binding IsSettingsSection}" />
-      <views:DemoView IsVisible="{Binding IsDemoSection}" />
     </Panel>
   </DockPanel>
 </Window>
