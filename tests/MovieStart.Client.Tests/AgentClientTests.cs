@@ -1,11 +1,11 @@
 using System.Net;
 using System.Net.Http.Json;
-using MovieStart.Desktop.Services;
+using MovieStart.Client;
 using MovieStart.Shared.Health;
 using MovieStart.Shared.Library;
 using MovieStart.Shared.Player;
 
-namespace MovieStart.Desktop.Tests;
+namespace MovieStart.Client.Tests;
 
 public class AgentClientTests
 {

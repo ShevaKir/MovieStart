@@ -32,7 +32,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\MovieStart.Shared\MovieStart.Shared.csproj" />
+    <ProjectReference Include="..\MovieStart.Client\MovieStart.Client.csproj" />
   </ItemGroup>
 
 </Project>

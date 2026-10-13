@@ -1,3 +1,4 @@
+using MovieStart.Client;
 using MovieStart.Desktop.ViewModels;
 using MovieStart.Shared.Health;
 
