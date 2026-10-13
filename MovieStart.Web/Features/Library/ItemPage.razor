@@ -4,8 +4,8 @@
 @inject PlayerStore Player
 @inject NavigationManager Navigation
 
-<a class="back" href="">
-    <svg viewBox="0 0 24 24"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z" /></svg>
+<a class="link muted back" href="">
+    <Icon Path="@Icons.Back" />
     Library
 </a>
 
@@ -33,18 +33,28 @@ else
         </div>
     </section>
 
-    @if (item.Files.Count > 0)
-    {
-        <div class="actions">
-            <button class="accent" @onclick="() => Library.PlayAsync(item.Id, new PlayItemRequest())">
-                <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+    <div class="actions">
+        @if (item.CanStartOver() && item.ChooseFileToContinue() is { } next)
+        {
+            <button @onclick="() => Library.PlayAsync(item.Id, new PlayItemRequest(next.Id, FromStart: true))">Start over</button>
+        }
+        @if (item.Files.Count > 0)
+        {
+            <button class="accent play-main" @onclick="() => Library.PlayAsync(item.Id, new PlayItemRequest())">
+                <Icon Path="@Icons.Play" />
                 @item.PlayLabel()
             </button>
-            @if (item.CanStartOver() && item.ChooseFileToContinue() is { } next)
-            {
-                <button @onclick="() => Library.PlayAsync(item.Id, new PlayItemRequest(next.Id, FromStart: true))">Start over</button>
-            }
-        </div>
+        }
+        <button class="icon" title="Delete" aria-label="Delete" @onclick="() => _confirmingDelete = true">
+            <Icon Path="@Icons.Delete" />
+        </button>
+    </div>
+
+    @if (_confirmingDelete)
+    {
+        <DeleteConfirmation OnCancel="() => _confirmingDelete = false" OnConfirm="() => DeleteAsync(item)">
+            Delete <strong>@item.Title</strong> and all its files from the Pi? This cannot be undone.
+        </DeleteConfirmation>
     }
 
     @if (item.Kind == MediaKind.Series && item.Files.Count > 0)
@@ -63,12 +73,11 @@ else
         }
     }
 
-    <div class="danger-zone">
-        <ConfirmButton Label="Delete from the Pi" Question="@($"Delete {item.Title} and all its files?")" OnConfirm="() => DeleteAsync(item)" />
-    </div>
 }
 
 @code {
+    private bool _confirmingDelete;
+
     [Parameter]
     public Guid Id { get; set; }
 
@@ -79,6 +88,7 @@ else
 
     private async Task DeleteAsync(LibraryItem item)
     {
+        _confirmingDelete = false;
         await Library.DeleteItemAsync(item.Id);
         if (Library.Find(item.Id) is null)
             Navigation.NavigateTo("");

@@ -32,42 +32,99 @@ a { color: var(--accent); }
 .muted { color: var(--muted); }
 .empty { margin: 48px 0; text-align: center; }
 
+/* Buttons follow the desktop styles (MovieStart.Desktop/Styles/AppStyles.axaml): one size, centered content, a pressed state for every kind. */
 button {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
     min-height: 40px;
-    padding: 8px 14px;
+    padding: 0 16px;
     border: 1px solid #D6D3CC;
-    border-radius: 10px;
+    border-radius: 8px;
     background: var(--surface);
     color: var(--text);
     font: inherit;
-    font-weight: 500;
     cursor: pointer;
+    transition: background-color 0.12s, border-color 0.12s, color 0.12s;
 }
 
+button svg { flex: none; width: 12px; height: 12px; fill: currentColor; }
+
 button:active { background: var(--line); }
-button:disabled { opacity: 0.5; }
+button:disabled { opacity: 0.45; }
 
-button.accent { border-color: var(--accent); background: var(--accent); color: white; }
-button.accent:active { background: var(--accent-strong); }
+@media (hover: hover) {
+    button:hover { background: #F1EFEB; border-color: #C2BEB5; }
+    button.accent:hover { background: var(--accent-strong); border-color: var(--accent-strong); }
+    button.danger:hover { background: #A93226; border-color: #A93226; }
+    button.ghost:hover { background: #EEEDE9; }
+    button.mini:hover { background: var(--accent-soft); color: var(--accent-strong); }
+    button.play:hover { background: #3A3833; border-color: #3A3833; }
+    button.link:hover { background: transparent; color: #0F4F33; }
+    button.link.muted:hover { color: var(--text); }
+}
 
-button.danger { border-color: var(--danger); background: var(--danger); color: white; }
+/* Main action: green. */
+button.accent { border-color: var(--accent); background: var(--accent); color: white; font-weight: 600; }
+button.accent:active { background: #0F4F33; border-color: #0F4F33; }
 
-button.ghost { border-color: transparent; background: transparent; color: var(--muted); }
+/* Destructive confirmation. */
+button.danger { border-color: var(--danger); background: var(--danger); color: white; font-weight: 600; }
+button.danger:active { background: #A93226; }
+
+/* Square icon button. */
+button.icon { width: 40px; height: 40px; padding: 0; }
+button.icon svg { width: 15px; height: 15px; }
+
+/* Small borderless round icon button for dense lists (episodes). */
+button.mini { width: 32px; height: 32px; min-height: 32px; padding: 0; border: 0; border-radius: 16px; background: transparent; color: #45433F; }
+button.mini:active { background: var(--accent-soft); color: var(--accent-strong); }
+
+/* Borderless button on a surface: remote transport, list actions. */
+button.ghost { padding: 0 10px; border-color: transparent; background: transparent; }
+button.ghost:active { background: #EEEDE9; }
+
+/* Text link. */
+button.link, a.link { min-height: 24px; padding: 0; border: 0; background: transparent; color: var(--accent); text-decoration: none; }
+button.link.muted, a.link.muted { color: var(--muted); }
+
+/* Round play/pause on the remote. */
+button.play { width: 48px; height: 48px; padding: 0; border-color: var(--text); border-radius: 24px; background: var(--text); color: var(--ground); }
+button.play:active { background: #3A3833; }
+button.play svg { width: 18px; height: 18px; }
+
+/* Fingers need a bigger target than the desktop's pointer. */
+@media (pointer: coarse) {
+    button.mini { width: 40px; height: 40px; min-height: 40px; border-radius: 20px; }
+    button.mini svg { width: 14px; height: 14px; }
+}
 
 select {
     width: 100%;
     min-height: 40px;
     padding: 8px 10px;
     border: 1px solid #D6D3CC;
-    border-radius: 10px;
+    border-radius: 8px;
     background: var(--surface);
     color: var(--text);
     font: inherit;
     font-size: 14px;
 }
+
+/* Asks before deleting; same look as the desktop confirmation. */
+.confirm {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px 8px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: #FBEAE8;
+}
+
+.confirm p { flex: 1 1 100%; margin: 0; color: #8A2A22; }
 
 input[type=range] { width: 100%; accent-color: var(--accent); }
 

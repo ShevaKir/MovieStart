@@ -14,9 +14,9 @@
     </a>
     @if (Item.Files.Count > 0)
     {
-        <button class="accent play" @onclick="() => Library.PlayAsync(Item.Id, new PlayItemRequest())">
-            <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-            <span>@Item.PlayLabel()</span>
+        <button class="accent" @onclick="() => Library.PlayAsync(Item.Id, new PlayItemRequest())">
+            <Icon Path="@Icons.Play" />
+            @Item.PlayLabel()
         </button>
     }
 </div>

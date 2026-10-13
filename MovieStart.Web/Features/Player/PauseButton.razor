@@ -1,20 +1,10 @@
 @inject PlayerStore Player
 
-<button class="toggle @(Small ? "small" : null)" aria-label="@(State.IsPaused ? "Play" : "Pause")" @onclick="Player.TogglePauseAsync">
-    @if (State.IsPaused)
-    {
-        <svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-    }
-    else
-    {
-        <svg viewBox="0 0 24 24"><path d="M6 4h4v16H6z M14 4h4v16h-4z" /></svg>
-    }
+<button class="play" aria-label="@(State.IsPaused ? "Play" : "Pause")" @onclick="Player.TogglePauseAsync">
+    <Icon Path="@(State.IsPaused ? Icons.Play : Icons.Pause)" />
 </button>
 
 @code {
     [Parameter, EditorRequired]
     public PlayerState State { get; set; } = null!;
-
-    [Parameter]
-    public bool Small { get; set; }
 }

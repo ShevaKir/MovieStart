@@ -9,8 +9,6 @@
 
 .open { display: flex; gap: 12px; color: inherit; text-decoration: none; min-width: 0; }
 .text { display: flex; flex-direction: column; gap: 4px; min-width: 0; padding-top: 2px; }
-.text strong { overflow: hidden; text-overflow: ellipsis; }
+.text strong { overflow: hidden; text-overflow: ellipsis; font-size: 17px; }
+.text .muted { font-size: 13px; }
 .downloading { font-size: 13px; color: var(--accent); }
-
-.play { justify-content: center; }
-.play svg { width: 18px; height: 18px; fill: currentColor; }
