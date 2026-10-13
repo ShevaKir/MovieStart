@@ -54,6 +54,12 @@ public sealed class LibraryService(
 
     private static readonly TimeSpan RecheckGracePeriod = TimeSpan.FromMinutes(2);
 
+    /// <summary>
+    /// Downloads started by the agent that have not been seen running yet. qBittorrent puts a checked torrent back
+    /// into the state it had before the check, so a start sent during a recheck is lost and is sent again.
+    /// </summary>
+    private readonly ConcurrentDictionary<Guid, byte> _starting = new();
+
     public async Task LoadAsync(CancellationToken cancellationToken)
     {
         Directory.CreateDirectory(media.Value.Root);
@@ -236,7 +242,7 @@ public sealed class LibraryService(
             download = download with { Files = files };
             if (starting)
             {
-                await qbit.ResumeAsync(hash, cancellationToken);
+                await StartTorrentAsync(downloadId, hash, cancellationToken);
                 download = download with { Status = DownloadStatus.Queued, Progress = 0, SizeBytes = wantedSize };
                 logger.LogInformation(
                     "{Title}: fetching {Count} episode(s) of {Release}",
@@ -245,7 +251,7 @@ public sealed class LibraryService(
             else if (download.Status == DownloadStatus.Ready && restored.Count > 0)
             {
                 // The torrent was stopped when it finished; sync takes it from here until the new files are in.
-                await qbit.ResumeAsync(hash, cancellationToken);
+                await StartTorrentAsync(downloadId, hash, cancellationToken);
                 download = download with
                 {
                     Status = DownloadStatus.Queued,
@@ -326,8 +332,13 @@ public sealed class LibraryService(
         }
     }
 
-    public Task PauseDownloadAsync(Guid itemId, Guid downloadId, CancellationToken cancellationToken) =>
-        qbit.PauseAsync(RequireActiveHash(itemId, downloadId), cancellationToken);
+    public Task PauseDownloadAsync(Guid itemId, Guid downloadId, CancellationToken cancellationToken)
+    {
+        var hash = RequireActiveHash(itemId, downloadId);
+        // The viewer's pause wins over a start still waiting for a recheck.
+        _starting.TryRemove(downloadId, out _);
+        return qbit.PauseAsync(hash, cancellationToken);
+    }
 
     public Task ResumeDownloadAsync(Guid itemId, Guid downloadId, CancellationToken cancellationToken) =>
         qbit.ResumeAsync(RequireActiveHash(itemId, downloadId), cancellationToken);
@@ -440,6 +451,8 @@ public sealed class LibraryService(
         foreach (var (itemId, kind, download) in active)
         {
             var torrent = FindTorrent(torrents, download.Id);
+            if (torrent is not null && _starting.ContainsKey(download.Id))
+                await KeepStartingAsync(download.Id, torrent, cancellationToken);
             var (updated, completed) = Track(download, torrent);
             if (updated.Files is null && torrent is not null && MapStatus(torrent) != DownloadStatus.Queued)
                 updated = updated with { Files = await ReadFilesAsync(kind, updated.Season, torrent.Hash, cancellationToken) };
@@ -683,6 +696,31 @@ public sealed class LibraryService(
     /// Makes qBittorrent forget pieces whose data was deleted. Pieces a deleted file shared with a kept neighbour
     /// still count as done otherwise, and choosing that file again would leave holes in it.
     /// </summary>
+    private async Task StartTorrentAsync(Guid downloadId, string hash, CancellationToken cancellationToken)
+    {
+        _starting[downloadId] = 0;
+        await qbit.ResumeAsync(hash, cancellationToken);
+    }
+
+    /// <summary>Starts the torrent again if a recheck stopped it; forgets it once it runs.</summary>
+    private async Task KeepStartingAsync(Guid downloadId, QbitTorrent torrent, CancellationToken cancellationToken)
+    {
+        var checking = torrent.State.StartsWith("checking", StringComparison.Ordinal)
+            || (_rechecks.TryGetValue(downloadId, out var requestedAt) && time.GetUtcNow() - requestedAt < RecheckGracePeriod);
+        if (checking)
+            return;
+
+        if (torrent.State is "stoppedDL" or "pausedDL")
+        {
+            logger.LogInformation("Starting {Hash} again after a recheck stopped it", torrent.Hash);
+            await qbit.ResumeAsync(torrent.Hash, cancellationToken);
+        }
+        else
+        {
+            _starting.TryRemove(downloadId, out _);
+        }
+    }
+
     private async Task RecheckAsync(Guid downloadId, string hash, CancellationToken cancellationToken)
     {
         _rechecks[downloadId] = time.GetUtcNow();

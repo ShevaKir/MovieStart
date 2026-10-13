@@ -739,6 +739,45 @@ public sealed class LibraryServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task DownloadStoppedByARecheckIsStartedAgain()
+    {
+        var series = await AddFinishedSeasonWithFirstEpisodeAsync();
+        await _library.SelectFilesAsync(series.Id, series.Downloads[0].Id, new SelectFilesRequest([0, 1]), Token);
+        _qbit.Resumed.Clear();
+
+        // A recheck was running when the start arrived; afterwards qBittorrent stops the torrent again.
+        _qbit.Update("h1", torrent => torrent with { State = "checkingUP", Progress = 0.4 });
+        await _library.SyncAsync(Token);
+        Assert.Empty(_qbit.Resumed);
+
+        _qbit.Update("h1", torrent => torrent with { State = "stoppedDL", Progress = 0.5 });
+        await _library.SyncAsync(Token);
+        Assert.Equal(["h1"], _qbit.Resumed);
+
+        // Once it runs, a later stop is the viewer's and stays.
+        _qbit.Update("h1", torrent => torrent with { State = "downloading" });
+        await _library.SyncAsync(Token);
+        _qbit.Update("h1", torrent => torrent with { State = "stoppedDL" });
+        await _library.SyncAsync(Token);
+        Assert.Equal(["h1"], _qbit.Resumed);
+    }
+
+    [Fact]
+    public async Task PauseBeforeTheDownloadRunsIsKept()
+    {
+        var series = await AddFinishedSeasonWithFirstEpisodeAsync();
+        var download = series.Downloads[0];
+        await _library.SelectFilesAsync(series.Id, download.Id, new SelectFilesRequest([0, 1]), Token);
+        _qbit.Resumed.Clear();
+
+        await _library.PauseDownloadAsync(series.Id, download.Id, Token);
+        _qbit.Update("h1", torrent => torrent with { State = "stoppedDL", Progress = 0.5 });
+        await _library.SyncAsync(Token);
+
+        Assert.Empty(_qbit.Resumed);
+    }
+
+    [Fact]
     public async Task StaleFinishedProgressDoesNotEndAReopenedDownload()
     {
         var series = await AddFinishedSeasonWithFirstEpisodeAsync();
