@@ -11,7 +11,8 @@ namespace MovieStart.Agent.Player;
 /// Controls an mpv instance started separately (systemd on the Pi) with <c>--idle --input-ipc-server</c>.
 /// Keeps reconnecting while the agent runs and mirrors mpv properties into <see cref="State"/>.
 /// </summary>
-public sealed partial class MpvPlayer(IOptions<PlayerOptions> options, ILogger<MpvPlayer> logger) : BackgroundService, IPlayer
+public sealed partial class MpvPlayer(IOptions<PlayerOptions> options, IAudioOutput audio, ILogger<MpvPlayer> logger)
+    : BackgroundService, IPlayer
 {
     private static readonly string[] ObservedProperties =
         ["idle-active", "path", "media-title", "pause", "time-pos", "duration", "volume", "aid", "sid", "track-list"];
@@ -42,7 +43,20 @@ public sealed partial class MpvPlayer(IOptions<PlayerOptions> options, ILogger<M
 
     public async Task PlayAsync(string path, PlaybackOptions options, CancellationToken cancellationToken)
     {
+        var audioRestarted = await audio.RestoreAsync(cancellationToken);
         await SendMpvAsync(ToLoadCommand(path, options, _loadfileHasIndex), cancellationToken);
+        if (audioRestarted)
+        {
+            // mpv's audio stream died with the old WirePlumber and is not recreated on its own.
+            try
+            {
+                await SendMpvAsync(["ao-reload"], cancellationToken);
+            }
+            catch (PlayerCommandException ex)
+            {
+                logger.LogWarning("mpv could not reopen its audio output: {Reason}", ex.Message);
+            }
+        }
         await SendMpvAsync(["set_property", "pause", false], cancellationToken);
     }
 

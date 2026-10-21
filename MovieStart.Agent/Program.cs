@@ -29,6 +29,7 @@ builder.Services.AddSingleton<IStorageProbe, DriveStorageProbe>();
 builder.Services.AddSingleton<IMediaProbe, FfprobeMediaProbe>();
 builder.Services.AddSingleton<IVoiceProfileStore, FileVoiceProfileStore>();
 
+builder.Services.AddSingleton<IAudioOutput, PipeWireAudioOutput>();
 builder.Services.AddSingleton<MpvPlayer>();
 builder.Services.AddSingleton<IPlayer>(services => services.GetRequiredService<MpvPlayer>());
 builder.Services.AddHostedService(services => services.GetRequiredService<MpvPlayer>());
