@@ -9,12 +9,14 @@ namespace MovieStart.Agent.Tests;
 public sealed class MpvPlayerTests : IAsyncLifetime
 {
     private readonly FakeMpvServer _mpv = new();
+    private readonly FakeAudioOutput _audio = new();
     private MpvPlayer _player = null!;
 
     public async ValueTask InitializeAsync()
     {
         _player = new MpvPlayer(
             Options.Create(new PlayerOptions { SocketPath = _mpv.SocketPath }),
+            _audio,
             NullLogger<MpvPlayer>.Instance);
         await _player.StartAsync(TestContext.Current.CancellationToken);
         await Eventually.AssertAsync(() => _player.State.IsConnected, "the player connects to mpv");
@@ -35,6 +37,28 @@ public sealed class MpvPlayerTests : IAsyncLifetime
 
         var commands = _mpv.Commands.Where(c => Name(c) is not ("observe_property" or "get_property")).Select(Render).ToList();
         Assert.Equal(["loadfile /mnt/movies/Dune.mkv replace", "set_property pause False"], commands);
+    }
+
+    [Fact]
+    public async Task ReopensAudioWhenTheAudioOutputWasRestarted()
+    {
+        _audio.Restarts = true;
+
+        await _player.PlayAsync("/mnt/movies/Dune.mkv", new PlaybackOptions(), TestContext.Current.CancellationToken);
+
+        var commands = _mpv.Commands.Where(c => Name(c) is not ("observe_property" or "get_property")).Select(Render).ToList();
+        Assert.Equal(["loadfile /mnt/movies/Dune.mkv replace", "ao-reload", "set_property pause False"], commands);
+    }
+
+    [Fact]
+    public async Task PlaysEvenWhenMpvCannotReopenAudio()
+    {
+        _audio.Restarts = true;
+        _mpv.FailCommand("ao-reload", "error running command");
+
+        await _player.PlayAsync("/mnt/movies/Dune.mkv", new PlaybackOptions(), TestContext.Current.CancellationToken);
+
+        Assert.Contains(_mpv.Commands, c => Render(c) == "set_property pause False");
     }
 
     [Fact]
@@ -155,6 +179,7 @@ public sealed class MpvPlayerTests : IAsyncLifetime
     {
         using var player = new MpvPlayer(
             Options.Create(new PlayerOptions { SocketPath = "/" + new string('x', 200) }),
+            new FakeAudioOutput(),
             NullLogger<MpvPlayer>.Instance);
 
         await player.StartAsync(TestContext.Current.CancellationToken);

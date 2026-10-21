@@ -9,6 +9,9 @@ WorkingDirectory=/opt/moviestart
 ExecStart=/opt/moviestart/MovieStart.Agent
 # mpv runs in the user's desktop session (deploy/mpv.service).
 Environment=Player__SocketPath=/run/user/1000/mpv.sock
+# Lets the agent reach the session's PipeWire (wpctl) and systemd (to restart WirePlumber).
+Environment=XDG_RUNTIME_DIR=/run/user/1000
+Environment=DBUS_SESSION_BUS_ADDRESS=unix:path=/run/user/1000/bus
 # Secrets: QBittorrent__Password, Prowlarr__ApiKey, Tmdb__ReadAccessToken.
 EnvironmentFile=/etc/moviestart/agent.env
 Restart=on-failure
