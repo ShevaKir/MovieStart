@@ -148,6 +148,37 @@ public sealed class LibraryServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task SeasonIsNotStoppedBeforeItsMetadataArrives()
+    {
+        await _library.AddAsync(Series(season: 1), Token);
+        _qbit.Appear("h1", state: "stalledDL");
+
+        await _library.SyncAsync(Token);
+
+        Assert.Null(_library.List()[0].Downloads[0].Files);
+        Assert.Empty(_qbit.Paused);
+
+        _qbit.Files["h1"] = SeasonFiles();
+        await _library.SyncAsync(Token);
+
+        Assert.NotNull(_library.List()[0].Downloads[0].Files);
+        Assert.Equal(["h1"], _qbit.Paused);
+    }
+
+    [Fact]
+    public async Task SeasonStoppedWithoutMetadataIsStartedAgain()
+    {
+        await _library.AddAsync(Series(season: 1), Token);
+        _qbit.Appear("h1", state: "stoppedDL");
+
+        await _library.SyncAsync(Token);
+
+        Assert.Equal(DownloadStatus.ChoosingFiles, _library.List()[0].Downloads[0].Status);
+        Assert.Null(_library.List()[0].Downloads[0].Files);
+        Assert.Equal(["h1"], _qbit.Resumed);
+    }
+
+    [Fact]
     public async Task SingleEpisodeStartsRightAway()
     {
         var item = await _library.AddAsync(Series(season: 1, episode: 2), Token);
