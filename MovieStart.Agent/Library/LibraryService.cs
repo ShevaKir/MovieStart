@@ -454,10 +454,13 @@ public sealed class LibraryService(
             if (torrent is not null && _starting.ContainsKey(download.Id))
                 await KeepStartingAsync(download.Id, torrent, cancellationToken);
             var (updated, completed) = Track(download, torrent);
-            if (updated.Files is null && torrent is not null && MapStatus(torrent) != DownloadStatus.Queued)
+            if (updated.Files is not { Count: > 0 } && torrent is not null && MapStatus(torrent) != DownloadStatus.Queued)
                 updated = updated with { Files = await ReadFilesAsync(kind, updated.Season, torrent.Hash, cancellationToken) };
+            // A torrent stopped before its metadata arrived never gets a file list, so it has to run until it does.
+            if (updated.Status == DownloadStatus.ChoosingFiles && updated.Files is null && torrent is not null && MapStatus(torrent) == DownloadStatus.Paused)
+                await qbit.ResumeAsync(torrent.Hash, cancellationToken);
             // qBittorrent stops it once the metadata is in; should it run anyway, nothing is fetched before the choice.
-            if (updated.Status == DownloadStatus.ChoosingFiles && torrent is not null && MapStatus(torrent) == DownloadStatus.Downloading
+            if (updated.Status == DownloadStatus.ChoosingFiles && updated.Files is not null && torrent is not null && MapStatus(torrent) == DownloadStatus.Downloading
                 && !torrent.State.StartsWith("checking", StringComparison.Ordinal))
                 await qbit.PauseAsync(torrent.Hash, cancellationToken);
             IReadOnlyList<QbitFile>? files = null;
@@ -498,7 +501,7 @@ public sealed class LibraryService(
                         continue;
 
                     // A selection made meanwhile wins over the list read before it.
-                    var merged = download with { Files = current.Files ?? download.Files };
+                    var merged = download with { Files = current.Files is { Count: > 0 } ? current.Files : download.Files };
                     if (files is null)
                     {
                         updated = ReplaceDownload(updated, merged);
@@ -566,9 +569,13 @@ public sealed class LibraryService(
 
     /// <summary>Reads the torrent's file list and turns off samples and extras right away.</summary>
     /// <param name="season">Season of the download, for episode files that name only the episode ("02. Cover-Up.mkv").</param>
-    private async Task<IReadOnlyList<DownloadFile>> ReadFilesAsync(MediaKind kind, int? season, string hash, CancellationToken cancellationToken)
+    /// <returns>The files, or null while qBittorrent has no metadata and so no file list.</returns>
+    private async Task<IReadOnlyList<DownloadFile>?> ReadFilesAsync(MediaKind kind, int? season, string hash, CancellationToken cancellationToken)
     {
         var files = await qbit.GetFilesAsync(hash, cancellationToken);
+        if (files.Count == 0)
+            return null;
+
         var skip = FileSelection.AutoSkip(kind, files).Where(index => files.First(file => file.Index == index).IsWanted).ToList();
         await qbit.SetFilePriorityAsync(hash, skip, QbitClient.SkipPriority, cancellationToken);
         return files
